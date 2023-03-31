@@ -1,0 +1,4 @@
+rootProject.name = 'kafka-connect-ytsaurus'
+
+include 'test'
+

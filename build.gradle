@@ -1,0 +1,98 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'maven-publish'
+}
+
+repositories {
+    mavenCentral()
+}
+
+description = "kafka-connect-ytsaurus"
+group 'ru.dzen.kafka.connect.ytsaurus'
+version '1.0.0'
+
+apply from: 'versions.gradle'
+
+dependencies {
+    implementation "org.apache.kafka:connect-api:$kafkaVersion"
+    implementation "org.apache.kafka:connect-json:$kafkaVersion"
+    implementation "org.apache.kafka:kafka-clients:$kafkaVersion"
+    implementation "org.apache.kafka:kafka-streams:$kafkaVersion"
+    implementation "tech.ytsaurus:ytsaurus-client:$ytVersion"
+    implementation "com.google.guava:guava:$guavaVersion"
+    implementation "org.slf4j:slf4j-api:$slf4jVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitJupiterVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:$junitJupiterVersion"
+    testImplementation "org.mockito:mockito-core:$mockitoCoreVersion"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+shadowJar {
+    dependencies {
+        // provided in the connect classpath
+        exclude(dependency('org.apache.kafka:connect-api:.*'))
+        exclude(dependency('org.apache.kafka:kafka-clients:.*'))
+        exclude(dependency('net.jpountz.lz4:.*:.*'))
+        exclude(dependency('org.xerial.snappy:.*:.*'))
+        exclude(dependency('org.slf4j:.*:.*'))
+    }
+
+    archiveFileName = "${project.name}.jar"
+}
+
+compileJava {
+    sourceCompatibility = "11"
+    targetCompatibility = "11"
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            pom {
+                name = 'kafka-connect-ytsaurus'
+                description = 'Kafka Connect YTsaurus Sink Connector is a Kafka Connect plugin for writing data from Kafka topics to static or ordered dynamic tables in YTsaurus.'
+                url = 'https://github.com/dzen-platform/kafka-connect-ytsaurus'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'nordikafiles'
+                        name = 'Maxim Makarov'
+                        email = 'maksiik@gmail.com'
+                    }
+                    developer {
+                        id = 'kaikash'
+                        name = 'Gleb Vishnevsky'
+                        email = 'vishgleb@mail.ru'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/dzen-platform/kafka-connect-ytsaurus.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:dzen-platform/kafka-connect-ytsaurus.git'
+                    url = 'https://github.com/dzen-platform/kafka-connect-ytsaurus'
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'MavenCentral'
+            url = findProperty('mavenCentralUrl') ?: System.getenv('MAVEN_CENTRAL_URL')
+            credentials {
+                username = findProperty('mavenCentralUsername') ?: System.getenv('MAVEN_CENTRAL_USERNAME')
+                password = findProperty('mavenCentralPassword') ?: System.getenv('MAVEN_CENTRAL_PASSWORD')
+            }
+        }
+    }
+}
