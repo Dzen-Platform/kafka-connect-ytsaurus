@@ -79,18 +79,18 @@ Coming soon
 
 - From GitHub Release:
 
-  Download the JAR file from a GitHub release using the command line with `wget` or `curl`. Replace `<url>` with the known download URL for the release:
+  Download the JAR file from a GitHub release using the command line with `wget` or `curl`:
 
   - wget:
 
     ```
-      wget <url>
+      wget https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.0.0/kafka-connect-ytsaurus-1.0.0.jar
     ```
 
   - curl:
 
     ```
-      curl -L -O <url>
+      curl -L -O https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.0.0/kafka-connect-ytsaurus-1.0.0.jar
     ```
 
 ### Build from Source
