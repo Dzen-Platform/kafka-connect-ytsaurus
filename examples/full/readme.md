@@ -28,19 +28,23 @@ Follow these steps to set up and run the example:
       ```
       make produce-json-schema-messages SCHEMA_NAME=test-json-schema
       ```
-   2. `yt-sink-static-unstructured.json`: for static tables with an unstructured schema
+   2. `yt-sink-static-inferred.json`: for static tables with a strict schema inferred from the first batch processed
       ```
-      make create-connector CONNECTOR_NAME=yt-sink-static-unstructured
+      make create-connector CONNECTOR_NAME=yt-sink-static-inferred
       ```
-   3. `yt-sink-static-inferred-from-finalized-table.json`: for static tables with a strict schema inferred from the first batch processed
+   3. `yt-sink-static-inferred-from-finalized-table.json`: for static tables with a strict schema inferred from all rows processed
       ```
       make create-connector CONNECTOR_NAME=yt-sink-static-inferred-from-finalized-table
       ```
-   4. `yt-sink-static-weak.json`: for static tables with a weak schema
+   4. `yt-sink-static-unstructured.json`: for static tables with an unstructured schema
+      ```
+      make create-connector CONNECTOR_NAME=yt-sink-static-unstructured
+      ```
+   5. `yt-sink-static-weak.json`: for static tables with a weak schema
       ```
       make create-connector CONNECTOR_NAME=yt-sink-static-weak
       ```
-   5. `yt-sink-dynamic-unstructured.json`: for dynamic tables with an unstructured schema
+   6. `yt-sink-dynamic-unstructured.json`: for dynamic tables with an unstructured schema
       ```
       make create-connector CONNECTOR_NAME=yt-sink-dynamic-unstructured
       ```
