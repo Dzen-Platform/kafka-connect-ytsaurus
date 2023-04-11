@@ -181,7 +181,6 @@ For a more comprehensive introduction, follow the [Quick Start Guide](quickstart
 
 ## Todo
 
-- Implement support for structured tables (utilizing explicit schema, e.g., from Schema Registry).
 - Publish the plugin on Confluent Hub.
 - Implement support for [sorted dynamic tables](https://ytsaurus.tech/docs/en/user-guide/dynamic-tables/sorted-dynamic-tables).
 - Implement a source connector.
