@@ -17,6 +17,7 @@ Kafka Connect YTsaurus Sink Connector is a [Kafka Connect](https://docs.confluen
 
     Data can be written in various formats, defined via the `yt.sink.output.table.schema.type` [configuration property](#configuration-properties):
 
+    - 'strict' (recommended): Messages from Apache Kafka are written across multiple columns in YTsaurus tables, based on `record.valueSchema()` of input messages. Currently incompatible with dynamic tables.
     - 'unstructured': Messages from Apache Kafka are written in separate columns in YTsaurus tables, along with metadata columns.
 
     - 'weak': Messages from Apache Kafka are written across multiple columns in YTsaurus tables, based on the inferred record schema from JSON-like input messages. Currently incompatible with dynamic tables.
