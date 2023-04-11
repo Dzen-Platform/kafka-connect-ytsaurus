@@ -7,15 +7,17 @@ import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.connector.Task;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
-import ru.dzen.kafka.connect.ytsaurus.dynamic.DynTableWriter;
-import ru.dzen.kafka.connect.ytsaurus.dynamic.DynTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.statik.StaticTableWriter;
-import ru.dzen.kafka.connect.ytsaurus.statik.StaticTableWriterConfig;
+import ru.dzen.kafka.connect.ytsaurus.common.Util;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
 
 public class YtTableSinkConnector extends SinkConnector {
 
@@ -37,7 +39,20 @@ public class YtTableSinkConnector extends SinkConnector {
     } else if (config.getOutputType() == BaseTableWriterConfig.OutputType.STATIC_TABLES) {
       manager = new StaticTableWriter(new StaticTableWriterConfig(props)).getManager();
     }
-    manager.start();
+
+    try {
+      Util.retryWithBackoff(() -> {
+        try {
+          manager.start();
+        } catch (Exception exc) {
+          log.warn("Exception in start: ", exc);
+          throw exc;
+        }
+      }, 10, 1000, 120000);
+    } catch (Exception exc) {
+      throw new ConnectException(exc);
+    }
+
     log.info("Started YtTableSinkConnector");
   }
 

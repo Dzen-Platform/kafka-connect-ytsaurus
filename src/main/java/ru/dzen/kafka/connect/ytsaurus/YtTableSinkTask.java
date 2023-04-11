@@ -12,10 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriter;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.dynamic.DynTableWriter;
-import ru.dzen.kafka.connect.ytsaurus.dynamic.DynTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.statik.StaticTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.statik.StaticTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
 
 public class YtTableSinkTask extends SinkTask {
 

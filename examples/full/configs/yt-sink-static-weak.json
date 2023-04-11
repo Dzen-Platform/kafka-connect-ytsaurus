@@ -1,5 +1,5 @@
 {
-    "name": "yt-sink",
+    "name": "yt-sink-static-weak",
     "config": {
         "key.converter": "org.apache.kafka.connect.storage.StringConverter",
         "value.converter": "org.apache.kafka.connect.json.JsonConverter",
@@ -12,11 +12,12 @@
         "yt.connection.token": "",
         "yt.connection.cluster": "http://yt.backend:80",
         "yt.sink.output.type": "STATIC_TABLES",
-        "yt.sink.output.directory": "//home/yt-sink/test",
+        "yt.sink.output.directory": "//home/yt-sink-static-weak/test",
         "yt.sink.output.table.schema.type": "WEAK",
         "yt.sink.output.key.format": "ANY",
         "yt.sink.output.value.format": "ANY",
         "yt.sink.output.ttl": "6h",
-        "yt.sink.static.rotation.period": "5m"
+        "yt.sink.static.rotation.period": "5m",
+        "yt.sink.static.tables.schema.inference.strategy": "INFER_FROM_FINALIZED_TABLE"
     }
 }

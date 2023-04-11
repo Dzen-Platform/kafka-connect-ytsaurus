@@ -1,4 +1,4 @@
-package ru.dzen.kafka.connect.ytsaurus.statik;
+package ru.dzen.kafka.connect.ytsaurus.staticTables;
 
 
 import java.util.HashMap;
@@ -61,7 +61,9 @@ public class DocumentOffsetsManager extends BaseOffsetsManager {
   public void lockPartitions(ApiServiceTransaction trx, Set<TopicPartition> topicPartitions)
       throws InterruptedException, ExecutionException {
     for (var topicPartition : topicPartitions) {
-      trx.lockNode(LockNode.builder().setPath(pathToOffsetsDirectory).setMode(LockMode.Shared).setChildKey(String.format("%s-%d", topicPartition.topic(), topicPartition.partition())).build()).get();
+      trx.lockNode(LockNode.builder().setPath(pathToOffsetsDirectory).setMode(LockMode.Shared)
+          .setChildKey(String.format("%s-%d", topicPartition.topic(), topicPartition.partition()))
+          .build()).get();
     }
   }
 }

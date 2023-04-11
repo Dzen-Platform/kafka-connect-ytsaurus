@@ -18,7 +18,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092
       KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -45,12 +45,27 @@ services:
       KAFKA_REST_BOOTSTRAP_SERVERS: 'broker:29092'
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
 
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.0.9
+    container_name: schema-registry
+    depends_on:
+      - broker
+    ports:
+      - "8081:8081"
+    environment:
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      - SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL=PLAINTEXT
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=broker:29092
+    restart: always
+
   connect:
     image: kafka-connect-with-yt-plugin
     hostname: connect
     container_name: connect
     depends_on:
       - broker
+      - schema-registry
     ports:
       - "8083:8083"
     environment:
@@ -104,7 +119,7 @@ services:
     image: ytsaurus/ui:${UI_VERSION:-stable}
     container_name: yt.frontend
     ports:
-      - '${INTERFACE_PORT:-8001}:80'
+      - '${INTERFACE_PORT:-8010}:80'
     environment:
       PROXY: localhost:8000
       PROXY_INTERNAL: yt.backend:80

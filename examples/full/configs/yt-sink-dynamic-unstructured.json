@@ -1,0 +1,22 @@
+{
+  "name": "yt-sink-dynamic-unstructured",
+  "config": {
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "connector.class": "ru.dzen.kafka.connect.ytsaurus.YtTableSinkConnector",
+    "tasks.max": "1",
+    "topics": "test",
+    "yt.connection.user": "root",
+    "yt.connection.token": "",
+    "yt.connection.cluster": "http://yt.backend:80",
+    "yt.sink.output.type": "DYNAMIC_TABLE",
+    "yt.sink.output.directory": "//home/yt-sink-dynamic-unstructured/test",
+    "yt.sink.output.table.schema.type": "UNSTRUCTURED",
+    "yt.sink.output.key.format": "ANY",
+    "yt.sink.output.value.format": "ANY",
+    "yt.sink.output.ttl": "6h",
+    "yt.sink.static.rotation.period": "5m"
+  }
+}

@@ -9,10 +9,10 @@ build: copy-jar
 
 copy-jar: build-jar
 	mkdir -p ./temp_data
-	cp ../../../build/libs/kafka-connect-ytsaurus.jar ./temp_data/
+	cp ../../../../build/libs/kafka-connect-ytsaurus.jar ./temp_data/
 
 build-jar:
-	cd ../../../ && $(MAKE)
+	cd ../../../../ && $(MAKE)
 
 clean:
 	docker rmi $(IMAGE_NAME)

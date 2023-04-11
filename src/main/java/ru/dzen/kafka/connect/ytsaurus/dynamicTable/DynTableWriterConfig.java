@@ -1,4 +1,4 @@
-package ru.dzen.kafka.connect.ytsaurus.dynamic;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable;
 
 import java.util.Map;
 import org.apache.kafka.common.config.ConfigDef;

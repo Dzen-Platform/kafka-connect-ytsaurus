@@ -1,11 +1,14 @@
-package ru.dzen.kafka.connect.ytsaurus.dynamic;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.kafka.connect.errors.RetriableException;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema;
+import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
+import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.ETableType;
 import tech.ytsaurus.client.YTsaurusClient;
 import tech.ytsaurus.client.request.CreateNode;
 import tech.ytsaurus.client.request.MountTable;
@@ -22,26 +25,22 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
     super(config);
   }
 
-
-  protected void createDynamicTable(YTsaurusClient client, YPath path, TableSchema schema)
+  protected void createDynamicTable(YTsaurusClient client, YPath path, TableSchema schema,
+      Map<String, YTreeNode> extraAttributes)
       throws Exception {
+    var attributes = new HashMap<>(Map.of(
+        "dynamic", YTree.booleanNode(true),
+        "schema", schema.toYTree(),
+        "enable_dynamic_store_read", YTree.booleanNode(true)
+    ));
+    attributes.putAll(extraAttributes);
     var createNodeBuilder = CreateNode.builder().setPath(path)
-        .setType(CypressNodeType.TABLE).setAttributes(Map.of(
-            "dynamic", YTree.booleanNode(true),
-            "schema", schema.toYTree(),
-            "enable_dynamic_store_read", YTree.booleanNode(true)
-        )).setIgnoreExisting(true);
+        .setType(CypressNodeType.TABLE).setAttributes(attributes).setIgnoreExisting(true);
     client.createNode(createNodeBuilder.build()).get();
     log.info(String.format("Created table %s", path));
   }
 
   protected void mountDynamicTable(YTsaurusClient client, YPath path) throws Exception {
-    var attributes = client.getNode(path + "/@").get().mapNode();
-    var currentTabletState = attributes.get("tablet_state").map(YTreeNode::stringValue);
-    if (currentTabletState.equals(Optional.of("mounted"))) {
-      log.info("Table %s is already mounted", path);
-      return;
-    }
     log.info("Trying to mount table %s", path);
     client.mountTableAndWaitTablets(new MountTable(path)).get();
     log.info("Mounted table %s", path);
@@ -63,13 +62,11 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
           config.getDataQueueTablePath()));
       return;
     }
-    var currentTabletState = attributes.get("tablet_state")
-        .map(YTreeNode::stringValue);
-    if (currentTabletState.equals(Optional.of("mounted"))) {
-      log.info(String.format("Unmounting table %s", config.getDataQueueTablePath()));
-      client.unmountTableAndWaitTablets(config.getDataQueueTablePath().toString()).join();
-      log.info(String.format("Unmounted table %s", config.getDataQueueTablePath()));
-    }
+
+    log.info(String.format("Unmounting table %s", config.getDataQueueTablePath()));
+    client.unmountTableAndWaitTablets(config.getDataQueueTablePath().toString()).join();
+    log.info(String.format("Unmounted table %s", config.getDataQueueTablePath()));
+
     log.info(String.format("Resharding table %s", config.getDataQueueTablePath()));
     client.reshardTable(ReshardTable.builder().setPath(config.getDataQueueTablePath())
         .setTabletCount(config.getTabletCount()).build()).get();
@@ -93,12 +90,20 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
     }
     try {
       var dataQueueTableSchema = UnstructuredTableSchema.createDataQueueTableSchema(
-          config.getKeyOutputFormat(), config.getValueOutputFormat());
-      createDynamicTable(client, config.getDataQueueTablePath(), dataQueueTableSchema);
+          config.getKeyOutputFormat(), config.getValueOutputFormat(),
+          EColumn.getAllMetadataColumns(ETableType.DYNAMIC));
+
+      var desiredExtraAttributesWithTabletCount = new HashMap<>(config.getExtraQueueAttributes());
+      desiredExtraAttributesWithTabletCount.put("tablet_count",
+          YTree.node(config.getTabletCount()));
+      createDynamicTable(client, config.getDataQueueTablePath(), dataQueueTableSchema,
+          desiredExtraAttributesWithTabletCount);
+
       reshardQueueAndSetAttributesIfNeeded(client);
+
       mountDynamicTable(client, config.getDataQueueTablePath());
       createDynamicTable(client, config.getOffsetsTablePath(),
-          UnstructuredTableSchema.offsetsTableSchema);
+          UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA, config.getExtraQueueAttributes());
       mountDynamicTable(client, config.getOffsetsTablePath());
     } catch (Exception ex) {
       log.warn("Cannot initialize queue", ex);

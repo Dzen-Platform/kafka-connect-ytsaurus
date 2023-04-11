@@ -101,7 +101,8 @@ public class Util {
     return res;
   }
 
-  public static <T> T retryWithBackoff(Callable<T> task, int maxRetries, long initialBackoffMillis, long maxBackoffMillis) throws Exception {
+  public static <T> T retryWithBackoff(Callable<T> task, int maxRetries, long initialBackoffMillis,
+      long maxBackoffMillis) throws Exception {
     Exception lastException = null;
     long backoffMillis = initialBackoffMillis;
 
@@ -128,5 +129,14 @@ public class Util {
     } else {
       throw new Exception("Retry operation failed due to interruption.");
     }
+  }
+
+  public static void retryWithBackoff(Runnable task, int maxRetries, long initialBackoffMillis,
+      long maxBackoffMillis) throws Exception {
+    Callable<Void> callableTask = () -> {
+      task.run();
+      return null;
+    };
+    retryWithBackoff(callableTask, maxRetries, initialBackoffMillis, maxBackoffMillis);
   }
 }

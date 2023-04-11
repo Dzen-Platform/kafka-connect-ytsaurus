@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.kafka.common.config.ConfigValue;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.dynamic.DynTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.statik.StaticTableWriterConfig;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
 
 class ConfigTest {
 

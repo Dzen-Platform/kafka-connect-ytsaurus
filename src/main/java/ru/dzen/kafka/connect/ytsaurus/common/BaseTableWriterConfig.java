@@ -37,11 +37,11 @@ public class BaseTableWriterConfig extends AbstractConfig {
               OutputType.STATIC_TABLES.name()),
           ConfigDef.Importance.HIGH,
           "Specifies the output type: 'dynamic_table' for a sharded queue similar to Apache Kafka or 'static_tables' for separate time-based tables")
-      .define(KEY_OUTPUT_FORMAT, ConfigDef.Type.STRING, OutputFormat.STRING.name(),
+      .define(KEY_OUTPUT_FORMAT, ConfigDef.Type.STRING, OutputFormat.ANY.name(),
           ValidUpperString.in(OutputFormat.STRING.name(), OutputFormat.ANY.name()),
           ConfigDef.Importance.HIGH,
           "Determines the output format for keys: 'string' for plain string keys or 'any' for keys with no specific format")
-      .define(VALUE_OUTPUT_FORMAT, ConfigDef.Type.STRING, OutputFormat.STRING.name(),
+      .define(VALUE_OUTPUT_FORMAT, ConfigDef.Type.STRING, OutputFormat.ANY.name(),
           ValidUpperString.in(OutputFormat.STRING.name(), OutputFormat.ANY.name()),
           ConfigDef.Importance.HIGH,
           "Determines the output format for values: 'string' for plain string values or 'any' for values with no specific format")

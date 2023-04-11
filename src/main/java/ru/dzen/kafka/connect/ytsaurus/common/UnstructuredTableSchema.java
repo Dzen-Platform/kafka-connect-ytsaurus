@@ -1,56 +1,55 @@
 package ru.dzen.kafka.connect.ytsaurus.common;
 
 
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 import tech.ytsaurus.core.tables.TableSchema;
 import tech.ytsaurus.typeinfo.TiType;
 
 public final class UnstructuredTableSchema {
 
-  public static final TableSchema offsetsTableSchema = TableSchema.builder()
+  public static final TableSchema OFFSETS_TABLE_SCHEMA = TableSchema.builder()
       .addKey(EColumn.TOPIC.name, TiType.string())
       .addKey(EColumn.PARTITION.name, TiType.uint32())
       .addValue(EColumn.OFFSET.name, TiType.uint64())
       .build();
 
-  public static TableSchema createDataQueueTableSchemaWithSelectedMetadata(TiType keyType,
-      TiType dataType, Set<EColumn> metadataColumns) {
+  public static TableSchema createDataQueueTableSchema(
+      BaseTableWriterConfig.OutputFormat keyOutputFormat,
+      BaseTableWriterConfig.OutputFormat valueOutputFormat, Map<EColumn, String> metadataColumns) {
     var builder = TableSchema.builder()
         .setUniqueKeys(false);
-    builder.addValue(EColumn.KEY.name, keyType)
-        .addValue(EColumn.DATA.name, dataType);
-    if (metadataColumns.contains(EColumn.TOPIC)) {
-      builder.addValue(EColumn.TOPIC.name, TiType.string());
+    if (keyOutputFormat != null) {
+      builder.addValue(EColumn.KEY.name, keyOutputFormat.toTiType());
     }
-    if (metadataColumns.contains(EColumn.PARTITION)) {
-      builder.addValue(EColumn.PARTITION.name, TiType.uint64());
+    if (valueOutputFormat != null) {
+      builder.addValue(EColumn.DATA.name, valueOutputFormat.toTiType());
     }
-    if (metadataColumns.contains(EColumn.OFFSET)) {
-      builder.addValue(EColumn.OFFSET.name, TiType.uint64());
+    if (metadataColumns.containsKey(EColumn.TOPIC)) {
+      builder.addValue(metadataColumns.get(EColumn.TOPIC), TiType.string());
     }
-    if (metadataColumns.contains(EColumn.TIMESTAMP)) {
-      builder.addValue(EColumn.TIMESTAMP.name, TiType.uint64());
+    if (metadataColumns.containsKey(EColumn.PARTITION)) {
+      builder.addValue(metadataColumns.get(EColumn.PARTITION), TiType.uint64());
     }
-    if (metadataColumns.contains(EColumn.HEADERS)) {
-      builder.addValue(EColumn.HEADERS.name, TiType.optional(TiType.yson()));
+    if (metadataColumns.containsKey(EColumn.OFFSET)) {
+      builder.addValue(metadataColumns.get(EColumn.OFFSET), TiType.uint64());
+    }
+    if (metadataColumns.containsKey(EColumn.TIMESTAMP)) {
+      builder.addValue(metadataColumns.get(EColumn.TIMESTAMP), TiType.uint64());
+    }
+    if (metadataColumns.containsKey(EColumn.HEADERS)) {
+      builder.addValue(metadataColumns.get(EColumn.HEADERS), TiType.optional(TiType.yson()));
     }
 
     return builder.build();
   }
 
-  public static TableSchema createDataQueueTableSchema(TiType keyType, TiType dataType) {
-    return createDataQueueTableSchemaWithSelectedMetadata(keyType, dataType,
-        EColumn.getAllMetadataColumns());
-  }
-
-  public static TableSchema createDataQueueTableSchema(
-      BaseTableWriterConfig.OutputFormat keyOutputFormat,
-      BaseTableWriterConfig.OutputFormat valueOutputFormat) {
-    TiType keyType = keyOutputFormat.toTiType();
-    TiType dataType = valueOutputFormat.toTiType();
-
-    return createDataQueueTableSchema(keyType, dataType);
+  public enum ETableType {
+    STATIC,
+    DYNAMIC
   }
 
   public enum EColumn {
@@ -60,26 +59,34 @@ public final class UnstructuredTableSchema {
     PARTITION("_partition", TiType.uint64(), true),
     OFFSET("_offset", TiType.uint64(), true),
     TIMESTAMP("_timestamp", TiType.uint64(), true),
-    HEADERS("_headers", TiType.optional(TiType.yson()), true);
+    HEADERS("_headers", TiType.optional(TiType.yson()), true),
+    SYSTEM_TIMESTAMP("_timestamp", TiType.uint64(), true, ETableType.DYNAMIC),
+    SYSTEM_CUMULATIVE_DATA_WEIGHT("_timestamp", TiType.uint64(), true, ETableType.DYNAMIC);
 
     public final String name;
 
     public final TiType type;
     public final boolean isMetadata;
+    private final Set<ETableType> tableTypes;
 
     // Constructor
-    EColumn(String value, TiType type, boolean isMetadata) {
+    EColumn(String value, TiType type, boolean isMetadata, ETableType... tableTypes) {
       this.name = value;
       this.type = type;
       this.isMetadata = isMetadata;
+      this.tableTypes = Arrays.stream(tableTypes).collect(Collectors.toSet());
+    }
+
+    EColumn(String value, TiType type, boolean isMetadata) {
+      this(value, type, isMetadata, ETableType.STATIC, ETableType.DYNAMIC);
     }
 
     // Getter
-    static Set<EColumn> getAllMetadataColumns() {
-      var columns = new TreeSet<EColumn>();
+    public static Map<EColumn, String> getAllMetadataColumns(ETableType tableType) {
+      var columns = new TreeMap<EColumn, String>();
       for (EColumn column : values()) {
-        if (column.isMetadata) {
-          columns.add(column);
+        if (column.isMetadata && column.tableTypes.contains(tableType)) {
+          columns.put(column, column.name);
         }
       }
       return columns;

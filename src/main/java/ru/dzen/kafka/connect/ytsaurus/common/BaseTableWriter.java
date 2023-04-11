@@ -2,6 +2,7 @@ package ru.dzen.kafka.connect.ytsaurus.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -10,9 +11,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputTableSchemaType;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.YTsaurusClient;
+import tech.ytsaurus.client.YtClientConfiguration;
 import tech.ytsaurus.client.request.StartTransaction;
 import tech.ytsaurus.client.rpc.YTsaurusClientAuth;
 import tech.ytsaurus.ysontree.YTree;
@@ -44,6 +47,7 @@ public abstract class BaseTableWriter {
   protected BaseTableWriter(BaseTableWriterConfig config, BaseOffsetsManager offsetsManager) {
     this.config = config;
     this.client = YTsaurusClient.builder()
+        .setYtClientConfiguration(new YtClientConfiguration.Builder().build())
         .setCluster(config.getYtCluster()).setAuth(
             YTsaurusClientAuth.builder()
                 .setUser(config.getYtUser())
@@ -75,6 +79,9 @@ public abstract class BaseTableWriter {
   }
 
   protected Object convertRecordKey(SinkRecord record) throws Exception {
+    if (record.key() == null) {
+      return JsonNodeFactory.instance.nullNode();
+    }
     if (record.key() instanceof String) {
       return record.key();
     }
@@ -103,6 +110,9 @@ public abstract class BaseTableWriter {
   }
 
   protected Object convertRecordValue(SinkRecord record) throws Exception {
+    if (record.value() == null) {
+      return JsonNodeFactory.instance.nullNode();
+    }
     if (record.value() instanceof String) {
       return record.value();
     }
@@ -129,7 +139,7 @@ public abstract class BaseTableWriter {
     return YTree.node(recordValue);
   }
 
-  protected List<Map<String, YTreeNode>> recordsToUnstructuredRows(Collection<SinkRecord> records) {
+  protected List<Map<String, YTreeNode>> recordsToRows(Collection<SinkRecord> records) {
     var mapNodesToWrite = new ArrayList<Map<String, YTreeNode>>();
     for (SinkRecord record : records) {
       var headersBuilder = YTree.builder().beginList();
@@ -139,21 +149,28 @@ public abstract class BaseTableWriter {
                 .buildList());
       }
       YTreeNode recordKeyNode;
-      YTreeNode recordValueNode;
       try {
         recordKeyNode = convertRecordKeyToNode(record);
+      } catch (Exception e) {
+        log.error("Exception in convertRecordKeyToNode:", e);
+        throw new DataException(e);
+      }
+      YTreeNode recordValueNode;
+      try {
         recordValueNode = convertRecordValueToNode(record);
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        log.error("Exception in convertRecordValueToNode:", e);
+        throw new DataException(e);
       }
 
       Map<String, YTreeNode> rowMap = new HashMap<>();
       if (config.getOutputTableSchemaType().equals(OutputTableSchemaType.UNSTRUCTURED)) {
         rowMap.put(UnstructuredTableSchema.EColumn.DATA.name, recordValueNode);
-      } else if (config.getOutputTableSchemaType().equals(OutputTableSchemaType.WEAK)) {
-        rowMap = recordValueNode.asMap();
       } else {
-        throw new ConnectException("STRICT type support is not implemented yet!");
+        if (!recordValueNode.isMapNode()) {
+          throw new DataException(String.format("Record value is not a map: %s", recordValueNode));
+        }
+        rowMap = recordValueNode.asMap();
       }
 
       rowMap.put(UnstructuredTableSchema.EColumn.KEY.name, recordKeyNode);
@@ -170,8 +187,16 @@ public abstract class BaseTableWriter {
     return mapNodesToWrite;
   }
 
-  protected abstract void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records)
-      throws Exception;
+  protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records)
+      throws Exception {
+
+  }
+
+  protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records,
+      Set<TopicPartition> topicPartitions)
+      throws Exception {
+    writeRows(trx, records);
+  }
 
   public void writeBatch(Collection<SinkRecord> records) throws Exception {
     var startTime = System.currentTimeMillis();
@@ -185,7 +210,7 @@ public abstract class BaseTableWriter {
       if (filteredRecords.isEmpty()) {
         trx.close();
       } else {
-        writeRows(trx, filteredRecords);
+        writeRows(trx, filteredRecords, maxOffsets.keySet());
         offsetsManager.writeOffsets(trx, maxOffsets);
         trx.commit().get();
       }

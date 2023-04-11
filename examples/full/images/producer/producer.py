@@ -4,6 +4,7 @@ import json
 import random
 import argparse
 import time
+import sys
 
 def some_json():
     return {
@@ -21,7 +22,7 @@ def some_json():
         ]
     }
 
-def wait_for_kafka_rest(url, timeout=60):
+def wait_for_kafka_rest(url, timeout=300):
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:

@@ -84,13 +84,13 @@ Coming soon
   - wget:
 
     ```
-      wget https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.0.0/kafka-connect-ytsaurus-1.0.0.jar
+      wget https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.1.0/kafka-connect-ytsaurus-1.1.0.jar
     ```
 
   - curl:
 
     ```
-      curl -L -O https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.0.0/kafka-connect-ytsaurus-1.0.0.jar
+      curl -L -O https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.1.0/kafka-connect-ytsaurus-1.1.0.jar
     ```
 
 ### Build from Source
@@ -106,12 +106,15 @@ Coming soon
 
   - using Gradle;
 
-    Prerequisites: JDK 11 or higher.
+    Prerequisites: 
+
+    - JDK 11 or higher.
+    - Make.
 
     Execute the following command:
 
     ```bash
-    ./gradlew shadowJar
+    make USE_GRADLE=true
     ```
   - using Docker;
 
@@ -123,7 +126,7 @@ Coming soon
     Execute the following command:
 
     ```bash
-    make
+    make USE_GRADLE=false
     ```
   Upon successful completion, you will find the JAR file at the path `build/libs/kafka-connect-ytsaurus.jar`.
 
@@ -143,8 +146,8 @@ For a more comprehensive introduction, follow the [Quick Start Guide](quickstart
 | `yt.connection.token` | Access token for the YT API authentication | password | - | HIGH | yes | 
 | `yt.connection.cluster` | Identifier of the YT cluster to connect to | string | - | HIGH | yes | 
 | `yt.sink.output.type` | Specifies the output type ('dynamic_table' or 'static_tables') | string | 'dynamic_table' | HIGH | no | 
-| `yt.sink.output.key.format` | Determines the output format for keys ('string' or 'any') | string | 'string' | HIGH | no | 
-| `yt.sink.output.value.format` | Determines the output format for values ('string' or 'any') | string | 'string' | HIGH | no | 
+| `yt.sink.output.key.format` | Determines the output format for keys ('string' or 'any') | string | 'any' | HIGH | no | 
+| `yt.sink.output.value.format` | Determines the output format for values ('string' or 'any') | string | 'any' | HIGH | no | 
 | `yt.sink.output.table.schema.type` | Defines the schema type for output tables ('unstructured' or 'weak'; 'strict' value to be supported later) | string | 'unstructured' | HIGH | no | 
 | `yt.sink.output.directory` | Specifies the output directory path | string | - | HIGH | yes | 
 | `yt.sink.metadata.directory.name` |  The name of the metadata subdirectory in the output directory | string | '__ connect_s ink_metadata __' | MEDIUM | no | 
@@ -163,7 +166,14 @@ For a more comprehensive introduction, follow the [Quick Start Guide](quickstart
 | Property | Description | Type | Default | Importance | Required |
 | -- | -- | -- | -- | -- | -- |
 | `yt.sink.static.rotation.period` | Rotation period | string | - | HIGH | yes |
-| `yt.sink.static.tables.dir.postfix` | The name of the static tables subdirectory in the output directory | string | 'output' | MEDIUM | no | 
+| `yt.sink.static.tables.dir.postfix` | The name of the static tables subdirectory in the output directory | string | 'output' | MEDIUM | no |
+| `yt.sink.static.compression.codec` | Compression codec of the output tables | string | zstd | MEDIUM | no |
+| `yt.sink.static.tables.optimize.for` | Specifies the storage optimization strategy for the table. Choose 'lookup' for row-based table storage optimized for point lookups, or 'scan' for column-based table storage optimized for scans and aggregations. | string | lookup | MEDIUM | no |
+| `yt.sink.static.tables.replication.factor` | The replication factor of the output tables | int | - | MEDIUM | no |
+| `yt.sink.static.tables.erasure.codec` | Erasure coding codec of the output tables | string | - | MEDIUM | no |
+| `yt.sink.static.merge.chunks` | Activate the consolidation of chunks during the table rotation process | boolean | false | MEDIUM | no |
+| `yt.sink.static.schema.inference.strategy` | The strategy for inferring the schema of the output tables. Valid options are DISABLED, INFER_FROM_FIRST_BATCH, and INFER_FROM_FINALIZED_TABLE. Schema inference strategy could be used only with STRICT output table schema type. <br><br>DISABLED means that the schema will not be inferred at all, and the output tables will have a weak schema that only includes the column names. <br><br>INFER_FROM_FIRST_BATCH means that the table schema will be created from the first batch of data, and will not change after the table is created. <br><br>INFER_FROM_FINALIZED_TABLE means that the weak schema will be used during the writing of rows, and after rotation, the finalized table will be re-merged with the schema based on all rows of the table. If using INFER_FROM_FINALIZED_TABLE, chunks will be merged. | string | DISABLED | HIGH | no |
+
 
 <!-- > **Warning**
 >

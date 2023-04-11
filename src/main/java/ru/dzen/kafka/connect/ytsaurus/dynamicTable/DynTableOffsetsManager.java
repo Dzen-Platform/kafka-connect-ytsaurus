@@ -1,7 +1,6 @@
-package ru.dzen.kafka.connect.ytsaurus.dynamic;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -9,6 +8,7 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseOffsetsManager;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema;
+import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.request.LookupRowsRequest;
 import tech.ytsaurus.client.request.ModifyRowsRequest;
@@ -27,7 +27,7 @@ public class DynTableOffsetsManager extends BaseOffsetsManager {
       Set<TopicPartition> topicPartitions) throws InterruptedException, ExecutionException {
     var requestBuilder = LookupRowsRequest.builder()
         .setPath(pathToOffsetsTable.toString())
-        .setSchema(UnstructuredTableSchema.offsetsTableSchema.toLookup());
+        .setSchema(UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA.toLookup());
     for (var topicPartition : topicPartitions) {
       requestBuilder = requestBuilder.addFilter(topicPartition.topic(), topicPartition.partition());
     }
@@ -52,12 +52,12 @@ public class DynTableOffsetsManager extends BaseOffsetsManager {
       throws InterruptedException, ExecutionException {
     var modifyRowsRequestBuilder = ModifyRowsRequest.builder()
         .setPath(pathToOffsetsTable.toString())
-        .setSchema(UnstructuredTableSchema.offsetsTableSchema);
+        .setSchema(UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA);
     for (var entry : offsets.entrySet()) {
-      modifyRowsRequestBuilder = modifyRowsRequestBuilder.addUpdate(List.of(
-          entry.getKey().topic(),
-          entry.getKey().partition(),
-          entry.getValue().offset()
+      modifyRowsRequestBuilder = modifyRowsRequestBuilder.addUpdate(Map.of(
+          EColumn.TOPIC.name, entry.getKey().topic(),
+          EColumn.PARTITION.name, entry.getKey().partition(),
+          EColumn.OFFSET.name, entry.getValue().offset()
       ));
     }
     trx.modifyRows(modifyRowsRequestBuilder.build()).get();

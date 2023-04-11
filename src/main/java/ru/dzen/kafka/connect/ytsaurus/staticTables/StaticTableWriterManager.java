@@ -1,19 +1,25 @@
-package ru.dzen.kafka.connect.ytsaurus.statik;
+package ru.dzen.kafka.connect.ytsaurus.staticTables;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.RetriableException;
-import ru.dzen.kafka.connect.ytsaurus.common.Util;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
+import ru.dzen.kafka.connect.ytsaurus.common.Util;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig.SchemaInferenceStrategy;
 import tech.ytsaurus.client.ApiServiceTransaction;
+import tech.ytsaurus.client.operations.MergeSpec;
+import tech.ytsaurus.client.operations.OperationStatus;
 import tech.ytsaurus.client.request.ColumnFilter;
 import tech.ytsaurus.client.request.CreateNode;
 import tech.ytsaurus.client.request.ListNode;
 import tech.ytsaurus.client.request.LockNode;
+import tech.ytsaurus.client.request.MergeOperation;
 import tech.ytsaurus.core.cypress.CypressNodeType;
 import tech.ytsaurus.core.cypress.YPath;
 import tech.ytsaurus.core.request.LockMode;
@@ -49,22 +55,65 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
                       .build())
               .get().asList();
           for (var table : allTables) {
-            if (table.getAttribute("final").isPresent() || YPath.simple(
-                    config.getOutputTablesDirectory() + "/" + table.stringValue())
+            if (table.getAttribute("final").isPresent() || config.getOutputTablesDirectory()
+                .child(table.stringValue())
                 .equals(currentTablePath)) {
               continue;
             }
-            var tablePath = YPath.simple(
-                config.getOutputTablesDirectory() + "/" + table.stringValue());
+            var tablePath = config.getOutputTablesDirectory().child(table.stringValue());
             log.info(String.format("Freezing table %s", tablePath));
             Util.waitAndLock(trx, LockNode.builder()
                 .setPath(tablePath)
                 .setWaitable(true)
                 .setMode(LockMode.Exclusive)
                 .build(), Duration.ofMinutes(2));
-            trx.setNode(tablePath.attribute("final").toString(), YTree.booleanNode(true)).get();
-            trx.setNode(tablePath.attribute("expiration_time").toString(),
-                YTree.node(now.toEpochMilli() + config.getOutputTTL().toMillis())).get();
+
+            var outputTableAttributes = new HashMap<>(Map.of(
+                "final", YTree.booleanNode(true),
+                "expiration_time", YTree.node(now.toEpochMilli() + config.getOutputTTL().toMillis())
+            ));
+            outputTableAttributes.putAll(config.getExtraTablesAttributes());
+            var needToRunMerge = config.getNeedToRunMerge();
+            if (config.getSchemaInferenceStrategy()
+                .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
+              outputTableAttributes.put("schema", schemaManager.getPrevSchema(trx).toYTree());
+            } else {
+              outputTableAttributes.put("schema", trx.getNode(tablePath.attribute("schema")).get());
+            }
+            if (needToRunMerge) {
+              log.info(String.format("Running merge for %s", tablePath));
+              var oldTablePath = YPath.simple(tablePath + ".old");
+              trx.moveNode(tablePath.toString(), oldTablePath.toString()).get();
+              System.out.printf("CreateNode.builder().setPath(%s).setAttributes(%s)\n"
+                      + "                      .setType(CypressNodeType.TABLE).build()%n", tablePath,
+                  outputTableAttributes);
+              trx.createNode(
+                  CreateNode.builder().setPath(tablePath).setAttributes(outputTableAttributes)
+                      .setType(CypressNodeType.TABLE).build()).get();
+              var mergeOperation = trx.startMerge(MergeOperation.builder().setSpec(
+                  MergeSpec.builder().setInputTables(oldTablePath).setOutputTable(tablePath)
+                      .setCombineChunks(true)
+                      .build()).build()).get();
+              log.info(String.format("Merge operation %s for %s started", mergeOperation.getId(),
+                  tablePath));
+              mergeOperation.watch().get();
+              var mergeOperationStatus = mergeOperation.getStatus().get();
+              if (mergeOperationStatus.equals(OperationStatus.COMPLETED)) {
+                log.info(String.format("Completed merge for %s", tablePath));
+              } else {
+                var mergeOperationResult = mergeOperation.getResult().get();
+                var errorMessage = String.format("Merge for %s failed: %s", tablePath,
+                    mergeOperationResult);
+                log.error(errorMessage);
+                throw new Exception(errorMessage);
+              }
+              trx.removeNode(oldTablePath.toString()).get();
+            } else {
+              for (var entry : outputTableAttributes.entrySet()) {
+                trx.setNode(tablePath.attribute(entry.getKey()).toString(), entry.getValue()).get();
+              }
+            }
+
             numberOfTablesToFreeze++;
           }
           trx.commit().get();
@@ -118,6 +167,20 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
       log.info("Created offsets directory %s", config.getOffsetsDirectory());
     } catch (Exception e) {
       throw new RetriableException(e);
+    }
+    if (config.getSchemaInferenceStrategy()
+        .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
+      try {
+        var createNodeBuilder = CreateNode.builder()
+            .setPath(config.getSchemasDirectory())
+            .setType(CypressNodeType.MAP)
+            .setRecursive(true)
+            .setIgnoreExisting(true);
+        client.createNode(createNodeBuilder.build()).get();
+        log.info("Created schemas directory %s", config.getSchemasDirectory());
+      } catch (Exception e) {
+        throw new RetriableException(e);
+      }
     }
     // Start the periodic task
     var periodMillis = config.getRotationPeriod().toMillis();
