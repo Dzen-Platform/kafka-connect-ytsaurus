@@ -148,7 +148,7 @@ For a more comprehensive introduction, follow the [Quick Start Guide](quickstart
 | `yt.sink.output.type` | Specifies the output type ('dynamic_table' or 'static_tables') | string | 'dynamic_table' | HIGH | no | 
 | `yt.sink.output.key.format` | Determines the output format for keys ('string' or 'any') | string | 'any' | HIGH | no | 
 | `yt.sink.output.value.format` | Determines the output format for values ('string' or 'any') | string | 'any' | HIGH | no | 
-| `yt.sink.output.table.schema.type` | Defines the schema type for output tables ('unstructured' or 'weak'; 'strict' value to be supported later) | string | 'unstructured' | HIGH | no | 
+| `yt.sink.output.table.schema.type` | Defines the schema type for output tables ('unstructured', 'weak' or 'strict') | string | 'unstructured' | HIGH | no | 
 | `yt.sink.output.directory` | Specifies the output directory path | string | - | HIGH | yes | 
 | `yt.sink.metadata.directory.name` |  The name of the metadata subdirectory in the output directory | string | '__ connect_s ink_metadata __' | MEDIUM | no | 
 | `yt.sink.output.ttl` | Time-to-live (TTL) for output tables or rows, specified as a duration (e.g., '30d' for 30 days) | string | '30d' | MEDIUM | no | 
