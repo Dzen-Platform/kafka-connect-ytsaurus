@@ -9,10 +9,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.RetriableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
 import ru.dzen.kafka.connect.ytsaurus.common.Util;
 import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig.SchemaInferenceStrategy;
-import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.operations.MergeSpec;
 import tech.ytsaurus.client.operations.OperationStatus;
 import tech.ytsaurus.client.request.ColumnFilter;
@@ -26,6 +27,8 @@ import tech.ytsaurus.core.request.LockMode;
 import tech.ytsaurus.ysontree.YTree;
 
 public class StaticTableWriterManager extends StaticTableWriter implements TableWriterManager {
+
+  private static final Logger log = LoggerFactory.getLogger(StaticTableWriterManager.class);
 
   private final ScheduledExecutorService scheduler;
   private ConnectorContext context;
@@ -43,11 +46,9 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
       var currentTablePath = getOutputTablePath(now);
       var retriesCount = 5;
       for (var i = 1; i <= retriesCount; i++) {
-        log.info(String.format("[Try %d of %d] Freezing tables...", i, retriesCount));
-        var trx = (ApiServiceTransaction) null;
+        log.info("[Try {} of {}] Freezing tables...", i, retriesCount);
         var numberOfTablesToFreeze = 0;
-        try {
-          trx = this.createTransaction();
+        try (var trx = this.createTransaction()) {
           var allTables = trx.listNode(
                   ListNode.builder()
                       .setPath(config.getOutputTablesDirectory())
@@ -61,7 +62,7 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
               continue;
             }
             var tablePath = config.getOutputTablesDirectory().child(table.stringValue());
-            log.info(String.format("Freezing table %s", tablePath));
+            log.info("Freezing table {}", tablePath);
             Util.waitAndLock(trx, LockNode.builder()
                 .setPath(tablePath)
                 .setWaitable(true)
@@ -73,20 +74,17 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
                 "expiration_time", YTree.node(now.toEpochMilli() + config.getOutputTTL().toMillis())
             ));
             outputTableAttributes.putAll(config.getExtraTablesAttributes());
-            var needToRunMerge = config.getNeedToRunMerge();
-            if (config.getSchemaInferenceStrategy()
-                .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
-              outputTableAttributes.put("schema", schemaManager.getPrevSchema(trx).toYTree());
-            } else {
-              outputTableAttributes.put("schema", trx.getNode(tablePath.attribute("schema")).get());
-            }
-            if (needToRunMerge) {
-              log.info(String.format("Running merge for %s", tablePath));
+            if (config.getNeedToRunMerge()) {
+              if (config.getSchemaInferenceStrategy()
+                  .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
+                outputTableAttributes.put("schema", schemaManager.getPrevSchema(trx).toYTree());
+              } else {
+                outputTableAttributes.put("schema",
+                    trx.getNode(tablePath.attribute("schema")).get());
+              }
+              log.info("Running merge for {}", tablePath);
               var oldTablePath = YPath.simple(tablePath + ".old");
               trx.moveNode(tablePath.toString(), oldTablePath.toString()).get();
-              System.out.printf("CreateNode.builder().setPath(%s).setAttributes(%s)\n"
-                      + "                      .setType(CypressNodeType.TABLE).build()%n", tablePath,
-                  outputTableAttributes);
               trx.createNode(
                   CreateNode.builder().setPath(tablePath).setAttributes(outputTableAttributes)
                       .setType(CypressNodeType.TABLE).build()).get();
@@ -94,16 +92,15 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
                   MergeSpec.builder().setInputTables(oldTablePath).setOutputTable(tablePath)
                       .setCombineChunks(true)
                       .build()).build()).get();
-              log.info(String.format("Merge operation %s for %s started", mergeOperation.getId(),
-                  tablePath));
+              log.info("Merge operation {} for {} started", mergeOperation.getId(),
+                  tablePath);
               mergeOperation.watch().get();
               var mergeOperationStatus = mergeOperation.getStatus().get();
               if (mergeOperationStatus.equals(OperationStatus.COMPLETED)) {
-                log.info(String.format("Completed merge for %s", tablePath));
+                log.info("Completed merge for {}", tablePath);
               } else {
                 var mergeOperationResult = mergeOperation.getResult().get();
-                var errorMessage = String.format("Merge for %s failed: %s", tablePath,
-                    mergeOperationResult);
+                var errorMessage = "Merge for " + tablePath + " failed: " + mergeOperationResult;
                 log.error(errorMessage);
                 throw new Exception(errorMessage);
               }
@@ -117,13 +114,10 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
             numberOfTablesToFreeze++;
           }
           trx.commit().get();
-          log.info(String.format("Frozen %d tables", numberOfTablesToFreeze));
+          log.info("Frozen {} tables", numberOfTablesToFreeze);
           break;
         } catch (Exception e) {
           log.warn("Can't freeze tables", e);
-          if (trx != null) {
-            trx.close();
-          }
           if (i == retriesCount) {
             throw e;
           }
@@ -149,11 +143,11 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
           .setRecursive(true)
           .setIgnoreExisting(true);
       client.createNode(createNodeBuilder.build()).get();
-      log.info("Created output tables directory %s", config.getOutputTablesDirectory());
+      log.info("Created output tables directory {}", config.getOutputTablesDirectory());
       var chunkModeAttrPath = config.getOutputTablesDirectory().attribute("chunk_merger_mode");
       client.setNode(chunkModeAttrPath.toString(),
           YTree.node("auto")).get();
-      log.info("Set %s to auto", chunkModeAttrPath);
+      log.info("Set {} to auto", chunkModeAttrPath);
     } catch (Exception e) {
       throw new RetriableException(e);
     }
@@ -164,7 +158,7 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
           .setRecursive(true)
           .setIgnoreExisting(true);
       client.createNode(createNodeBuilder.build()).get();
-      log.info("Created offsets directory %s", config.getOffsetsDirectory());
+      log.info("Created offsets directory {}", config.getOffsetsDirectory());
     } catch (Exception e) {
       throw new RetriableException(e);
     }
@@ -177,7 +171,7 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
             .setRecursive(true)
             .setIgnoreExisting(true);
         client.createNode(createNodeBuilder.build()).get();
-        log.info("Created schemas directory %s", config.getSchemasDirectory());
+        log.info("Created schemas directory {}", config.getSchemasDirectory());
       } catch (Exception e) {
         throw new RetriableException(e);
       }

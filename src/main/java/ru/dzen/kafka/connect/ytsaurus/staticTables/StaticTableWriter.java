@@ -34,7 +34,7 @@ import tech.ytsaurus.ysontree.YTreeMapNode;
 
 public class StaticTableWriter extends BaseTableWriter {
 
-  protected static final Logger log = LoggerFactory.getLogger(StaticTableWriter.class);
+  private static final Logger log = LoggerFactory.getLogger(StaticTableWriter.class);
 
   public final StaticTableWriterConfig config;
   protected final SchemaManager schemaManager;
@@ -92,9 +92,9 @@ public class StaticTableWriter extends BaseTableWriter {
         inferredSchemaBuilder.update(rows);
         var inferredSchema = inferredSchemaBuilder.build();
         log.warn(
-            String.format("Automatically inferred schema with %d columns from first %d rows: %s",
-                inferredSchema.getColumns().size(), rows.size(),
-                inferredSchema.toYTree().toString()));
+            "Automatically inferred schema with %d columns from first {} rows: {}",
+            inferredSchema.getColumns().size(), rows.size(),
+            inferredSchema.toYTree().toString());
         createNodeBuilder.setAttributes(Map.of("schema", inferredSchema.toYTree()));
       } else if (config.getOutputTableSchemaType().equals(OutputTableSchemaType.UNSTRUCTURED)) {
         createNodeBuilder.setAttributes(Map.of("schema", unstructuredTableSchema.toYTree()));

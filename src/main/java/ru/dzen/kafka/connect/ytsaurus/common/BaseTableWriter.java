@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.errors.DataException;
@@ -31,8 +32,8 @@ import tech.ytsaurus.ysontree.YTreeNode;
 
 public abstract class BaseTableWriter {
 
-  protected static final Logger log = LoggerFactory.getLogger(BaseTableWriter.class);
   protected static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final Logger log = LoggerFactory.getLogger(BaseTableWriter.class);
   private static final JsonConverter JSON_CONVERTER;
 
   static {
@@ -62,20 +63,18 @@ public abstract class BaseTableWriter {
 
   public Map<TopicPartition, OffsetAndMetadata> getSafeToCommitOffsets(
       Map<TopicPartition, OffsetAndMetadata> unsafeOffsets) throws Exception {
-    var trx = createTransaction();
-    var res = new HashMap<TopicPartition, OffsetAndMetadata>();
-    for (var entry : offsetsManager.getPrevOffsets(trx,
-        unsafeOffsets.keySet()).entrySet()) {
-      if (unsafeOffsets.containsKey(entry.getKey())) {
-        if (unsafeOffsets.get(entry.getKey()).offset() >= entry.getValue().offset()) {
-          res.put(entry.getKey(), entry.getValue());
-        } else {
-          // commit older offset if not yet consumed safe offset
-          res.put(entry.getKey(), unsafeOffsets.get(entry.getKey()));
-        }
-      }
-    }
-    return res;
+    return offsetsManager.getPrevOffsets(createTransaction(), unsafeOffsets.keySet()).entrySet()
+        .stream()
+        .filter(entry -> unsafeOffsets.containsKey(entry.getKey()))
+        .map(entry -> {
+          var topicPartition = entry.getKey();
+          var prevOffset = entry.getValue();
+          var unsafeOffset = unsafeOffsets.get(topicPartition);
+          return unsafeOffset.offset() >= prevOffset.offset() ?
+              Map.entry(topicPartition, prevOffset) :
+              Map.entry(topicPartition, unsafeOffset);
+        })
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   protected Object convertRecordKey(SinkRecord record) throws Exception {
@@ -90,7 +89,6 @@ public abstract class BaseTableWriter {
         record.key());
     var jsonString = new String(jsonBytes, StandardCharsets.UTF_8);
 
-    var objectMapper = new ObjectMapper();
     JsonNode jsonNode = objectMapper.readTree(jsonString);
 
     return jsonNode;
@@ -121,7 +119,6 @@ public abstract class BaseTableWriter {
         record.value());
     var jsonString = new String(jsonBytes, StandardCharsets.UTF_8);
 
-    var objectMapper = new ObjectMapper();
     JsonNode jsonNode = objectMapper.readTree(jsonString);
 
     return jsonNode;
@@ -168,7 +165,7 @@ public abstract class BaseTableWriter {
         rowMap.put(UnstructuredTableSchema.EColumn.DATA.name, recordValueNode);
       } else {
         if (!recordValueNode.isMapNode()) {
-          throw new DataException(String.format("Record value is not a map: %s", recordValueNode));
+          throw new DataException("Record value is not a map: " + recordValueNode);
         }
         rowMap = recordValueNode.asMap();
       }
@@ -200,8 +197,7 @@ public abstract class BaseTableWriter {
 
   public void writeBatch(Collection<SinkRecord> records) throws Exception {
     var startTime = System.currentTimeMillis();
-    var trx = createTransaction();
-    try {
+    try (var trx = createTransaction()) {
       var maxOffsets = offsetsManager.getMaxOffsets(records);
       offsetsManager.lockPartitions(trx, maxOffsets.keySet());
       var prevOffsets = offsetsManager.getPrevOffsets(trx,
@@ -215,11 +211,10 @@ public abstract class BaseTableWriter {
         trx.commit().get();
       }
       var elapsed = Duration.ofMillis(System.currentTimeMillis() - startTime);
-      log.info(String.format("Done processing batch in %s: %d total, %d written, %d skipped",
+      log.info("Done processing batch in {}: {} total, {} written, {} skipped",
           Util.toHumanReadableDuration(elapsed), records.size(), filteredRecords.size(),
-          records.size() - filteredRecords.size()));
+          records.size() - filteredRecords.size());
     } catch (Exception ex) {
-      trx.close();
       throw ex;
     }
   }

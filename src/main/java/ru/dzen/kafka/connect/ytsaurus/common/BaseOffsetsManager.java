@@ -1,10 +1,9 @@
 package ru.dzen.kafka.connect.ytsaurus.common;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -14,27 +13,22 @@ public abstract class BaseOffsetsManager {
 
   public Collection<SinkRecord> filterRecords(Collection<SinkRecord> sinkRecords,
       Map<TopicPartition, OffsetAndMetadata> prevOffsetsMap) {
-    Collection<SinkRecord> res = new ArrayList<>();
-    for (var record : sinkRecords) {
-      var topicPartition = new TopicPartition(record.topic(), record.kafkaPartition());
-      if (!prevOffsetsMap.containsKey(topicPartition)
-          || prevOffsetsMap.get(topicPartition).offset() < record.kafkaOffset()) {
-        res.add(record);
-      }
-    }
-    return res;
+    return sinkRecords.stream()
+        .filter(record -> {
+          var topicPartition = new TopicPartition(record.topic(), record.kafkaPartition());
+          return !prevOffsetsMap.containsKey(topicPartition)
+              || prevOffsetsMap.get(topicPartition).offset() < record.kafkaOffset();
+        })
+        .collect(Collectors.toList());
   }
 
   public Map<TopicPartition, OffsetAndMetadata> getMaxOffsets(Collection<SinkRecord> sinkRecords) {
-    Map<TopicPartition, OffsetAndMetadata> res = new HashMap<>();
-    for (var record : sinkRecords) {
-      var topicPartition = new TopicPartition(record.topic(), record.kafkaPartition());
-      if (!res.containsKey(topicPartition)
-          || res.get(topicPartition).offset() < record.kafkaOffset()) {
-        res.put(topicPartition, new OffsetAndMetadata(record.kafkaOffset()));
-      }
-    }
-    return res;
+    return sinkRecords.stream()
+        .collect(Collectors.toMap(
+            record -> new TopicPartition(record.topic(), record.kafkaPartition()),
+            record -> new OffsetAndMetadata(record.kafkaOffset()),
+            (prev, curr) -> curr.offset() > prev.offset() ? curr : prev
+        ));
   }
 
   public abstract Map<TopicPartition, OffsetAndMetadata> getPrevOffsets(ApiServiceTransaction trx,

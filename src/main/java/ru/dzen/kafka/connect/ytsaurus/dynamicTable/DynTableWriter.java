@@ -15,7 +15,7 @@ import tech.ytsaurus.client.request.StartTransaction;
 
 public class DynTableWriter extends BaseTableWriter {
 
-  protected static final Logger log = LoggerFactory.getLogger(DynTableWriter.class);
+  private static final Logger log = LoggerFactory.getLogger(DynTableWriter.class);
 
   public final DynTableWriterConfig config;
 
@@ -32,9 +32,7 @@ public class DynTableWriter extends BaseTableWriter {
         .setSchema(UnstructuredTableSchema.createDataQueueTableSchema(config.getKeyOutputFormat(),
             config.getValueOutputFormat(), EColumn.getAllMetadataColumns(ETableType.DYNAMIC)));
     var mapNodesToWrite = recordsToRows(records);
-    for (var mapNodeToWrite : mapNodesToWrite) {
-      modifyRowsRequestBuilder = modifyRowsRequestBuilder.addUpdate(mapNodeToWrite);
-    }
+    mapNodesToWrite.forEach(mapNodeToWrite -> modifyRowsRequestBuilder.addUpdate(mapNodeToWrite));
     trx.modifyRows(modifyRowsRequestBuilder.build()).get();
   }
 

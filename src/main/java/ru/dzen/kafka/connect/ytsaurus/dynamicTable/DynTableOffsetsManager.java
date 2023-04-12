@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseOffsetsManager;
@@ -27,22 +28,21 @@ public class DynTableOffsetsManager extends BaseOffsetsManager {
       Set<TopicPartition> topicPartitions) throws InterruptedException, ExecutionException {
     var requestBuilder = LookupRowsRequest.builder()
         .setPath(pathToOffsetsTable.toString())
-        .setSchema(UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA.toLookup());
+        .setSchema(UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA.toLookup())
+        .addLookupColumns(UnstructuredTableSchema.EColumn.TOPIC.name,
+            UnstructuredTableSchema.EColumn.PARTITION.name,
+            UnstructuredTableSchema.EColumn.OFFSET.name);
     for (var topicPartition : topicPartitions) {
       requestBuilder = requestBuilder.addFilter(topicPartition.topic(), topicPartition.partition());
     }
-    requestBuilder = requestBuilder.addLookupColumns(UnstructuredTableSchema.EColumn.TOPIC.name,
-        UnstructuredTableSchema.EColumn.PARTITION.name,
-        UnstructuredTableSchema.EColumn.OFFSET.name);
-    var prevOffsetsRows = trx.lookupRows(requestBuilder.build()).get().getRows();
-    var res = new HashMap<TopicPartition, OffsetAndMetadata>();
-    for (var row : prevOffsetsRows) {
-      var rowValues = row.getValues();
-      res.put(
-          new TopicPartition(rowValues.get(0).stringValue(), (int) rowValues.get(1).longValue()),
-          new OffsetAndMetadata(rowValues.get(2).longValue()));
-    }
-    return res;
+    var prevOffsetsRows = trx.lookupRows(requestBuilder.build())
+        .get().getRows().stream();
+    return prevOffsetsRows.collect(Collectors.toMap(
+        row -> new TopicPartition(row.getValues().get(0).stringValue(),
+            (int) row.getValues().get(1).longValue()),
+        row -> new OffsetAndMetadata(row.getValues().get(2).longValue()),
+        (v1, v2) -> v1,
+        HashMap::new));
   }
 
 
@@ -53,13 +53,13 @@ public class DynTableOffsetsManager extends BaseOffsetsManager {
     var modifyRowsRequestBuilder = ModifyRowsRequest.builder()
         .setPath(pathToOffsetsTable.toString())
         .setSchema(UnstructuredTableSchema.OFFSETS_TABLE_SCHEMA);
-    for (var entry : offsets.entrySet()) {
-      modifyRowsRequestBuilder = modifyRowsRequestBuilder.addUpdate(Map.of(
-          EColumn.TOPIC.name, entry.getKey().topic(),
-          EColumn.PARTITION.name, entry.getKey().partition(),
-          EColumn.OFFSET.name, entry.getValue().offset()
-      ));
-    }
+    offsets.entrySet().stream()
+        .map(entry -> Map.of(
+            EColumn.TOPIC.name, entry.getKey().topic(),
+            EColumn.PARTITION.name, entry.getKey().partition(),
+            EColumn.OFFSET.name, entry.getValue().offset()
+        ))
+        .forEach(update -> modifyRowsRequestBuilder.addUpdate(update));
     trx.modifyRows(modifyRowsRequestBuilder.build()).get();
   }
 

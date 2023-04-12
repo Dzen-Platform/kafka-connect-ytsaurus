@@ -81,15 +81,11 @@ public final class UnstructuredTableSchema {
       this(value, type, isMetadata, ETableType.STATIC, ETableType.DYNAMIC);
     }
 
-    // Getter
     public static Map<EColumn, String> getAllMetadataColumns(ETableType tableType) {
-      var columns = new TreeMap<EColumn, String>();
-      for (EColumn column : values()) {
-        if (column.isMetadata && column.tableTypes.contains(tableType)) {
-          columns.put(column, column.name);
-        }
-      }
-      return columns;
+      return Arrays.stream(values())
+          .filter(column -> column.isMetadata && column.tableTypes.contains(tableType))
+          .collect(Collectors.toMap(column -> column, column -> column.name, (c1, c2) -> c1,
+              TreeMap::new));
     }
   }
 }

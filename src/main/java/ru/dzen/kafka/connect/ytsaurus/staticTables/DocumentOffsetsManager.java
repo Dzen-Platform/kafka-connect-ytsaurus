@@ -30,7 +30,7 @@ public class DocumentOffsetsManager extends BaseOffsetsManager {
       Set<TopicPartition> topicPartitions) throws InterruptedException, ExecutionException {
     var res = new HashMap<TopicPartition, OffsetAndMetadata>();
     for (var topicPartition : topicPartitions) {
-      var path = String.format("%s/%d", pathToOffsetsDirectory, topicPartition.partition());
+      var path = pathToOffsetsDirectory + "/" + topicPartition.partition();
       if (trx.existsNode(path).get()) {
         var mapNode = (YTreeMapNode) trx.getNode(path).get();
         var offset = mapNode.get("offset").get().longValue();
@@ -47,7 +47,7 @@ public class DocumentOffsetsManager extends BaseOffsetsManager {
     for (var entry : offsets.entrySet()) {
       var topicPartition = entry.getKey();
       var offsetAndMetadata = entry.getValue();
-      var path = String.format("%s/%d", pathToOffsetsDirectory, topicPartition.partition());
+      var path = pathToOffsetsDirectory + "/" + topicPartition.partition();
       trx.createNode(
           CreateNode.builder().setPath(YPath.simple(path)).setType(CypressNodeType.DOCUMENT)
               .setIgnoreExisting(true).build()).get();
@@ -62,7 +62,7 @@ public class DocumentOffsetsManager extends BaseOffsetsManager {
       throws InterruptedException, ExecutionException {
     for (var topicPartition : topicPartitions) {
       trx.lockNode(LockNode.builder().setPath(pathToOffsetsDirectory).setMode(LockMode.Shared)
-          .setChildKey(String.format("%s-%d", topicPartition.topic(), topicPartition.partition()))
+          .setChildKey(topicPartition.topic() + "-" + topicPartition.partition())
           .build()).get();
     }
   }

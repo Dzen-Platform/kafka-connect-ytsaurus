@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.kafka.connect.errors.RetriableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
@@ -20,6 +22,8 @@ import tech.ytsaurus.ysontree.YTree;
 import tech.ytsaurus.ysontree.YTreeNode;
 
 public class DynTableWriterManager extends DynTableWriter implements TableWriterManager {
+
+  private static final Logger log = LoggerFactory.getLogger(DynTableWriterManager.class);
 
   public DynTableWriterManager(DynTableWriterConfig config) {
     super(config);
@@ -37,13 +41,13 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
     var createNodeBuilder = CreateNode.builder().setPath(path)
         .setType(CypressNodeType.TABLE).setAttributes(attributes).setIgnoreExisting(true);
     client.createNode(createNodeBuilder.build()).get();
-    log.info(String.format("Created table %s", path));
+    log.info("Created table {}", path);
   }
 
   protected void mountDynamicTable(YTsaurusClient client, YPath path) throws Exception {
-    log.info("Trying to mount table %s", path);
+    log.info("Trying to mount table {}", path);
     client.mountTableAndWaitTablets(new MountTable(path)).get();
-    log.info("Mounted table %s", path);
+    log.info("Mounted table {}", path);
   }
 
   protected void reshardQueueAndSetAttributesIfNeeded(YTsaurusClient client) throws Exception {
@@ -52,25 +56,25 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
       if (!Objects.equals(attributes.get(entry.getKey()), Optional.of(entry.getValue()))) {
         client.setNode(config.getDataQueueTablePath() + "/@" + entry.getKey(), entry.getValue());
         log.info(
-            String.format("Changed %s/@%s to %s", config.getDataQueueTablePath(), entry.getKey(),
-                entry.getValue()));
+            "Changed {}/@{} to {}", config.getDataQueueTablePath(), entry.getKey(),
+            entry.getValue());
       }
     }
     var currentTabletCount = attributes.get("tablet_count").map(YTreeNode::intValue);
     if (currentTabletCount.equals(Optional.of(config.getTabletCount()))) {
-      log.info(String.format("No need to reshard table %s: tablet count = desired tablet count",
-          config.getDataQueueTablePath()));
+      log.info("No need to reshard table {}: tablet count = desired tablet count",
+          config.getDataQueueTablePath());
       return;
     }
 
-    log.info(String.format("Unmounting table %s", config.getDataQueueTablePath()));
+    log.info("Unmounting table {}", config.getDataQueueTablePath());
     client.unmountTableAndWaitTablets(config.getDataQueueTablePath().toString()).join();
-    log.info(String.format("Unmounted table %s", config.getDataQueueTablePath()));
+    log.info("Unmounted table {}", config.getDataQueueTablePath());
 
-    log.info(String.format("Resharding table %s", config.getDataQueueTablePath()));
+    log.info("Resharding table {}", config.getDataQueueTablePath());
     client.reshardTable(ReshardTable.builder().setPath(config.getDataQueueTablePath())
         .setTabletCount(config.getTabletCount()).build()).get();
-    log.info(String.format("Successfully resharded table %s", config.getDataQueueTablePath()));
+    log.info("Successfully resharded table {}", config.getDataQueueTablePath());
   }
 
   @Override

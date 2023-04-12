@@ -1,8 +1,9 @@
 package ru.dzen.kafka.connect.ytsaurus;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.connect.connector.ConnectorContext;
@@ -69,33 +70,15 @@ public class YtTableSinkConnector extends SinkConnector {
 
   @Override
   public List<Map<String, String>> taskConfigs(int maxTasks) {
-    ArrayList<Map<String, String>> configs = new ArrayList<>();
-    for (int i = 0; i < maxTasks; i++) {
-      configs.add(props);
-    }
-    return configs;
+    return Stream.generate(() -> props)
+        .limit(maxTasks)
+        .collect(Collectors.toList());
   }
 
   @Override
   public void stop() {
     manager.stop();
     log.info("Stopped YtTableSinkConnector");
-  }
-
-
-  private void validateConfig(BaseTableWriterConfig config) {
-    if (config.getOutputType() == BaseTableWriterConfig.OutputType.DYNAMIC_TABLE) {
-      if (config.getOutputTableSchemaType()
-          != BaseTableWriterConfig.OutputTableSchemaType.UNSTRUCTURED) {
-        throw new UnsupportedOperationException(
-            "Only UNSTRUCTURED schema is supported for dynamic tables.");
-      }
-    } else if (config.getOutputType() == BaseTableWriterConfig.OutputType.STATIC_TABLES) {
-      if (config.getOutputTableSchemaType() == BaseTableWriterConfig.OutputTableSchemaType.STRICT) {
-        throw new UnsupportedOperationException(
-            "STRICT schema is not supported for static tables.");
-      }
-    }
   }
 
   @Override
