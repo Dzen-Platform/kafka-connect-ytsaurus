@@ -21,6 +21,7 @@ import tech.ytsaurus.client.request.CreateNode;
 import tech.ytsaurus.client.request.ListNode;
 import tech.ytsaurus.client.request.LockNode;
 import tech.ytsaurus.client.request.MergeOperation;
+import tech.ytsaurus.core.DataSize;
 import tech.ytsaurus.core.cypress.CypressNodeType;
 import tech.ytsaurus.core.cypress.YPath;
 import tech.ytsaurus.core.request.LockMode;
@@ -90,6 +91,7 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
                       .setType(CypressNodeType.TABLE).build()).get();
               var mergeOperation = trx.startMerge(MergeOperation.builder().setSpec(
                   MergeSpec.builder().setInputTables(oldTablePath).setOutputTable(tablePath)
+                      .setDataSizePerJob(DataSize.fromMegaBytes(config.getMergeDataSizePerJob()))
                       .setCombineChunks(true)
                       .build()).build()).get();
               log.info("Merge operation {} for {} started", mergeOperation.getId(),

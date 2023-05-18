@@ -173,8 +173,8 @@ For a more comprehensive introduction, follow the [Quick Start Guide](quickstart
 | `yt.sink.static.tables.replication.factor` | The replication factor of the output tables | int | - | MEDIUM | no |
 | `yt.sink.static.tables.erasure.codec` | Erasure coding codec of the output tables | string | - | MEDIUM | no |
 | `yt.sink.static.merge.chunks` | Activate the consolidation of chunks during the table rotation process | boolean | false | MEDIUM | no |
+| `yt.sink.static.merge.data.size.per.job` | Maximum size of data to be merged per job in MB. | int | 100 | MEDIUM | no |
 | `yt.sink.static.schema.inference.strategy` | The strategy for inferring the schema of the output tables. Valid options are DISABLED, INFER_FROM_FIRST_BATCH, and INFER_FROM_FINALIZED_TABLE. Schema inference strategy could be used only with STRICT output table schema type. <br><br>DISABLED means that the schema will not be inferred at all, and the output tables will have a weak schema that only includes the column names. <br><br>INFER_FROM_FIRST_BATCH means that the table schema will be created from the first batch of data, and will not change after the table is created. <br><br>INFER_FROM_FINALIZED_TABLE means that the weak schema will be used during the writing of rows, and after rotation, the finalized table will be re-merged with the schema based on all rows of the table. If using INFER_FROM_FINALIZED_TABLE, chunks will be merged. | string | DISABLED | HIGH | no |
-
 
 <!-- > **Warning**
 >

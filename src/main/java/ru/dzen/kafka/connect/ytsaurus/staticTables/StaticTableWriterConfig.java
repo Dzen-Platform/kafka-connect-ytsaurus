@@ -16,6 +16,7 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
   private static final String ROTATION_PERIOD = "yt.sink.static.rotation.period";
   private static final String OUTPUT_TABLES_DIRECTORY_POSTFIX = "yt.sink.static.tables.dir.postfix";
   private static final String MERGE_CHUNKS = "yt.sink.static.merge.chunks";
+  private static final String MERGE_DATA_SIZE_PER_JOB = "yt.sink.static.merge.data.size.per.job";
   private static final String SCHEMA_INFERENCE_STRATEGY = "yt.sink.static.tables.schema.inference.strategy";
   private static final String COMPRESSION_CODEC = "yt.sink.static.tables.compression.codec";
   private static final String OPTIMIZE_FOR = "yt.sink.static.tables.optimize.for";
@@ -37,6 +38,8 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
           "Erasure coding codec of the output tables.")
       .define(MERGE_CHUNKS, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.MEDIUM,
           "Activate the consolidation of chunks during the table rotation process.")
+      .define(MERGE_DATA_SIZE_PER_JOB, ConfigDef.Type.INT, 100, ConfigDef.Importance.MEDIUM,
+          "Maximum size of data to be merged per job in MB.")
       .define(SCHEMA_INFERENCE_STRATEGY, ConfigDef.Type.STRING,
           SchemaInferenceStrategy.DISABLED.name(),
           ValidUpperString.in(SchemaInferenceStrategy.DISABLED.name(),
@@ -89,6 +92,10 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
   public boolean getNeedToRunMerge() {
     return getBoolean(MERGE_CHUNKS) || getSchemaInferenceStrategy().equals(
         SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE);
+  }
+
+  public int getMergeDataSizePerJob() {
+    return getInt(MERGE_DATA_SIZE_PER_JOB);
   }
 
   public Map<String, YTreeNode> getExtraTablesAttributes() {
