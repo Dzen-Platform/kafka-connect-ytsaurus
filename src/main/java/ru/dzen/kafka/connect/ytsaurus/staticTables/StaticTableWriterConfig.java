@@ -39,7 +39,8 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
           "Erasure coding codec of the output tables.")
       .define(MERGE_CHUNKS, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.MEDIUM,
           "Activate the consolidation of chunks during the table rotation process.")
-      .define(CHUNK_MERGER_ATTRIBUTE_ENABLED, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.LOW, "Set chunk_merger_mode attribute to auto")
+      .define(CHUNK_MERGER_ATTRIBUTE_ENABLED, ConfigDef.Type.BOOLEAN, false,
+          ConfigDef.Importance.LOW, "Set chunk_merger_mode attribute to auto")
       .define(MERGE_DATA_SIZE_PER_JOB, ConfigDef.Type.INT, 100, ConfigDef.Importance.MEDIUM,
           "Maximum size of data to be merged per job in MB.")
       .define(SCHEMA_INFERENCE_STRATEGY, ConfigDef.Type.STRING,

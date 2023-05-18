@@ -9,13 +9,16 @@ import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
+import tech.ytsaurus.client.rpc.YTsaurusClientAuth;
 import tech.ytsaurus.core.cypress.YPath;
 import tech.ytsaurus.typeinfo.TiType;
 
 public class BaseTableWriterConfig extends AbstractConfig {
 
+  public static final String AUTH_TYPE = "yt.connection.auth.type";
   public static final String YT_USER = "yt.connection.user";
   public static final String YT_TOKEN = "yt.connection.token";
+  public static final String SERVICE_TICKET_PROVIDER_URL = "yt.connection.service.ticket.provider.url";
   public static final String YT_CLUSTER = "yt.connection.cluster";
   public static final String OUTPUT_TYPE = "yt.sink.output.type";
   public static final String OUTPUT_TABLE_SCHEMA_TYPE = "yt.sink.output.table.schema.type";
@@ -26,10 +29,16 @@ public class BaseTableWriterConfig extends AbstractConfig {
   public static final String METADATA_DIRECTORY_NAME = "yt.sink.metadata.directory.name";
 
   public static ConfigDef CONFIG_DEF = new ConfigDef()
-      .define(YT_USER, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH,
+      .define(AUTH_TYPE, ConfigDef.Type.STRING, AuthType.TOKEN.name(),
+          ValidUpperString.in(AuthType.TOKEN.name(), AuthType.SERVICE_TICKET.name()),
+          ConfigDef.Importance.HIGH,
+          "Specifies the auth type: 'token' for token authentication or 'service_ticket' for service ticket authentication")
+      .define(YT_USER, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH,
           "Username for the YT API authentication")
-      .define(YT_TOKEN, ConfigDef.Type.PASSWORD, ConfigDef.Importance.HIGH,
+      .define(YT_TOKEN, ConfigDef.Type.PASSWORD, null, ConfigDef.Importance.HIGH,
           "Access token for the YT API authentication")
+      .define(SERVICE_TICKET_PROVIDER_URL, ConfigDef.Type.PASSWORD, "", ConfigDef.Importance.HIGH,
+          "URL of the service ticket provider, required if 'yt.connection.auth.type' is 'SERVICE_TICKET'")
       .define(YT_CLUSTER, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH,
           "Identifier of the YT cluster to connect to")
       .define(OUTPUT_TYPE, ConfigDef.Type.STRING, OutputType.DYNAMIC_TABLE.name(),
@@ -62,6 +71,15 @@ public class BaseTableWriterConfig extends AbstractConfig {
 
   public BaseTableWriterConfig(ConfigDef configDef, Map<String, String> originals) {
     super(configDef, originals);
+
+    if (getAuthType() == AuthType.SERVICE_TICKET && getPassword(SERVICE_TICKET_PROVIDER_URL).value()
+        .isEmpty()) {
+      throw new ConfigException(SERVICE_TICKET_PROVIDER_URL, null,
+          "Must be set when 'yt.connection.auth.type' is 'SERVICE_TICKET'");
+    } else if (getAuthType() == AuthType.TOKEN && (get(YT_USER) == null || get(YT_TOKEN) == null)) {
+      throw new ConfigException(
+          "Both 'yt.connection.user' and 'yt.connection.token' must be set when 'yt.connection.auth.type' is 'TOKEN'");
+    }
   }
 
   public BaseTableWriterConfig(Map<String, String> originals) {
@@ -106,6 +124,34 @@ public class BaseTableWriterConfig extends AbstractConfig {
 
   public Duration getOutputTTL() {
     return Util.parseHumanReadableDuration(getString(OUTPUT_TTL));
+  }
+
+  public AuthType getAuthType() {
+    return AuthType.valueOf(getString(AUTH_TYPE).toUpperCase());
+  }
+
+  public String getServiceTicketProviderUrl() {
+    return getPassword(SERVICE_TICKET_PROVIDER_URL).value();
+  }
+
+  public YTsaurusClientAuth getYtClientAuth() {
+    var builder = YTsaurusClientAuth.builder();
+
+    if (getAuthType() == AuthType.TOKEN) {
+      builder.setUser(getYtUser());
+      builder.setToken(getYtToken());
+    } else if (getAuthType() == AuthType.SERVICE_TICKET) {
+      builder.setServiceTicketAuth(new HttpServiceTicketAuth(getServiceTicketProviderUrl()));
+    } else {
+      throw new RuntimeException("invalid AuthType!");
+    }
+
+    return builder.build();
+  }
+
+  public enum AuthType {
+    TOKEN,
+    SERVICE_TICKET
   }
 
   public enum OutputType {

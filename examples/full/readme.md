@@ -50,7 +50,7 @@ Follow these steps to set up and run the example:
       ```
    You can concurrently configure multiple connectors by using the command provided below. This command allows you to configure all connectors simultaneously:
    ```
-   make create-all-conntectors
+   make create-all-connectors
    make produce-messages-for-all-schemas
    ```
 

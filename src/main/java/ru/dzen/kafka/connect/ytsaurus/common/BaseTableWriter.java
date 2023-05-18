@@ -21,12 +21,12 @@ import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.AuthType;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputTableSchemaType;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.YTsaurusClient;
-import tech.ytsaurus.client.YtClientConfiguration;
+import tech.ytsaurus.client.YTsaurusClientConfig;
 import tech.ytsaurus.client.request.StartTransaction;
-import tech.ytsaurus.client.rpc.YTsaurusClientAuth;
 import tech.ytsaurus.ysontree.YTree;
 import tech.ytsaurus.ysontree.YTreeNode;
 
@@ -48,12 +48,9 @@ public abstract class BaseTableWriter {
   protected BaseTableWriter(BaseTableWriterConfig config, BaseOffsetsManager offsetsManager) {
     this.config = config;
     this.client = YTsaurusClient.builder()
-        .setYtClientConfiguration(new YtClientConfiguration.Builder().build())
-        .setCluster(config.getYtCluster()).setAuth(
-            YTsaurusClientAuth.builder()
-                .setUser(config.getYtUser())
-                .setToken(config.getYtToken())
-                .build()).build();
+        .setConfig(YTsaurusClientConfig.builder()
+            .setTvmOnly(config.getAuthType().equals(AuthType.SERVICE_TICKET)).build())
+        .setCluster(config.getYtCluster()).setAuth(config.getYtClientAuth()).build();
     this.offsetsManager = offsetsManager;
   }
 
