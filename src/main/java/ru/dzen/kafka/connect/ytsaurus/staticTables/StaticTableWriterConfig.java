@@ -16,6 +16,7 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
   private static final String ROTATION_PERIOD = "yt.sink.static.rotation.period";
   private static final String OUTPUT_TABLES_DIRECTORY_POSTFIX = "yt.sink.static.tables.dir.postfix";
   private static final String MERGE_CHUNKS = "yt.sink.static.merge.chunks";
+  private static final String CHUNK_MERGER_ATTRIBUTE_ENABLED = "yt.sink.static.chunk.merger.attribute.enabled";
   private static final String MERGE_DATA_SIZE_PER_JOB = "yt.sink.static.merge.data.size.per.job";
   private static final String SCHEMA_INFERENCE_STRATEGY = "yt.sink.static.tables.schema.inference.strategy";
   private static final String COMPRESSION_CODEC = "yt.sink.static.tables.compression.codec";
@@ -38,6 +39,7 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
           "Erasure coding codec of the output tables.")
       .define(MERGE_CHUNKS, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.MEDIUM,
           "Activate the consolidation of chunks during the table rotation process.")
+      .define(CHUNK_MERGER_ATTRIBUTE_ENABLED, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.LOW, "Set chunk_merger_mode attribute to auto")
       .define(MERGE_DATA_SIZE_PER_JOB, ConfigDef.Type.INT, 100, ConfigDef.Importance.MEDIUM,
           "Maximum size of data to be merged per job in MB.")
       .define(SCHEMA_INFERENCE_STRATEGY, ConfigDef.Type.STRING,
@@ -114,6 +116,10 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
     }
 
     return extraAttributes;
+  }
+
+  public boolean getChunkMergerAttributeEnabled() {
+    return getBoolean(CHUNK_MERGER_ATTRIBUTE_ENABLED);
   }
 
   public enum SchemaInferenceStrategy {

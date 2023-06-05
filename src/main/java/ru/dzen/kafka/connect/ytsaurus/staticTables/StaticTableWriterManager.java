@@ -146,10 +146,13 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
           .setIgnoreExisting(true);
       client.createNode(createNodeBuilder.build()).get();
       log.info("Created output tables directory {}", config.getOutputTablesDirectory());
-      var chunkModeAttrPath = config.getOutputTablesDirectory().attribute("chunk_merger_mode");
-      client.setNode(chunkModeAttrPath.toString(),
-          YTree.node("auto")).get();
-      log.info("Set {} to auto", chunkModeAttrPath);
+      if (config.getChunkMergerAttributeEnabled()) {
+        var chunkModeAttrPath = config.getOutputTablesDirectory().attribute("chunk_merger_mode");
+        client.setNode(chunkModeAttrPath.toString(),
+            YTree.node("auto")).get();
+        log.info("Set {} to auto", chunkModeAttrPath);
+      }
+
     } catch (Exception e) {
       throw new RetriableException(e);
     }
