@@ -1,6 +1,9 @@
 package ru.dzen.kafka.connect.ytsaurus;
 
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.kafka.connect.runtime.SinkConnectorConfig;
+import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,17 +60,21 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
     String connectorName = "ytsaurus-connector-unstructured";
     connect.configureConnector(connectorName, sinkConnectorProps);
     awaitConnectorIsStarted(connectorName);
+    int totalMessages = 10;
 
-    connect.kafka().produce(topic, keyJson, valueJson);
-    awaitCommittedOffset(connectorName, topic, 0, 1);
+    for (int i = 0; i < totalMessages; i++) {
+      connect.kafka().produce(topic, keyJson, valueJson);
+    }
+    awaitCommittedOffset(connectorName, topic, 0, totalMessages - 1);
 
     assertCypress().node(offsetsPath)
-        .valueEquals(YTree.mapBuilder().key("offset").value(1).buildMap());
+        .valueEquals(YTree.mapBuilder().key("offset").value(totalMessages - 1).buildMap());
     assertTable().anyStaticTableInDir(outputTableDir).exists();
     assertTable().anyStaticTableInDir(outputTableDir).rows()
-        .hasSize(1)
-        .anyMatch(row -> hasColumnContaining(row, EColumn.KEY.name, key))
-        .anyMatch(row -> hasColumnContaining(row, EColumn.DATA.name, value));
+        .hasSize(totalMessages)
+        .allMatch(row -> hasColumnContaining(row, EColumn.KEY.name, key))
+        .allMatch(row -> hasColumnContaining(row, EColumn.DATA.name, value))
+        .are(hasDifferentOffsets());
   }
 
   private boolean hasColumnContaining(YTreeMapNode row, String columnName, String textToSearch) {
@@ -76,5 +83,13 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
         .filter(YTreeNode::isStringNode)
         .map(v -> v.stringNode().stringValue().contains(textToSearch))
         .orElse(false);
+  }
+
+  private Condition<? super YTreeMapNode> hasDifferentOffsets() {
+    Set<Integer> encounteredOffsets = new HashSet<>();
+    return new Condition<>(row -> {
+      int offset = row.getInt(EColumn.OFFSET.name);
+      return encounteredOffsets.add(offset);
+    }, "Different offsets in table");
   }
 }
