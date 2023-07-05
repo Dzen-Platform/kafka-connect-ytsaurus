@@ -22,7 +22,7 @@ import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
 
 public class YtTableSinkConnector extends SinkConnector {
 
-  private static final Logger log = LoggerFactory.getLogger(YtTableSinkTask.class);
+  private static final Logger log = LoggerFactory.getLogger(YtTableSinkConnector.class);
   TableWriterManager manager;
   private Map<String, String> props;
 
