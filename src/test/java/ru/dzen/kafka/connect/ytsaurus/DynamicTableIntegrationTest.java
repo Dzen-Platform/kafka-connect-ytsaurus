@@ -12,20 +12,19 @@ import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputType;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
 import ru.dzen.kafka.connect.ytsaurus.integration.BaseYtsaurusConnectorIntegrationTest;
 import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
-import tech.ytsaurus.ysontree.YTree;
 
 /**
  * @author pbk-vitaliy
  */
-public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorIntegrationTest {
+public class DynamicTableIntegrationTest extends BaseYtsaurusConnectorIntegrationTest {
 
-  private static final String topic = "test-unstructured";
+  private static final String topic = "test-dynamic-unstructured";
   private static final String ytsaurusOutputDirectory =
       String.format("//home/%s/test", topic);
   private static final String offsetsPath =
-      String.format("%s/__connect_sink_metadata__/offsets/%s-0", ytsaurusOutputDirectory, topic);
-  private static final String outputTableDir =
-      String.format("%s/output", ytsaurusOutputDirectory);
+      String.format("%s/__connect_sink_metadata__/offsets", ytsaurusOutputDirectory);
+  private static final String outputTablePath =
+      String.format("%s/queue", ytsaurusOutputDirectory);
   private static final String key = "123";
   private static final String value = "text";
   private static final String keyJson = String.format("{\"id\":\"%s\"}", key);
@@ -36,7 +35,7 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
     this.sinkConnectorProps = baseSinkConnectorProps();
     sinkConnectorProps.put("value.converter.schemas.enable", "false");
     sinkConnectorProps.put(SinkConnectorConfig.TOPICS_CONFIG, topic);
-    sinkConnectorProps.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.STATIC_TABLES.name());
+    sinkConnectorProps.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_TABLE.name());
     sinkConnectorProps.put(BaseTableWriterConfig.OUTPUT_DIRECTORY, ytsaurusOutputDirectory);
     sinkConnectorProps.put(BaseTableWriterConfig.OUTPUT_TABLE_SCHEMA_TYPE, OutputTableSchemaType.UNSTRUCTURED.name());
     sinkConnectorProps.put(BaseTableWriterConfig.KEY_OUTPUT_FORMAT, OutputFormat.STRING.name());
@@ -52,8 +51,8 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
   }
 
   @Test
-  void writesMessagesToUnstructuredTable() {
-    String connectorName = "ytsaurus-connector-unstructured";
+  void writesMessagesToDynamicTable() {
+    String connectorName = "ytsaurus-connector-dynamic";
     connect.configureConnector(connectorName, sinkConnectorProps);
     awaitConnectorIsStarted(connectorName);
     int totalMessages = 10;
@@ -64,10 +63,10 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
     }
     awaitCommittedOffset(connectorName, topic, 0, expectedOffset);
 
-    assertCypress().node(offsetsPath).is()
-        .isEqualTo(YTree.mapBuilder().key("offset").value(expectedOffset).buildMap());
-    assertTable().anyStaticTableInDir(outputTableDir).exists();
-    assertTable().anyStaticTableInDir(outputTableDir).rows()
+    assertTable().dynamicTableWithPath(offsetsPath).rows()
+        .hasSize(1)
+        .allMatch(row -> row.getInt(EColumn.OFFSET.name) == expectedOffset);
+    assertTable().dynamicTableWithPath(outputTablePath).rows()
         .hasSize(totalMessages)
         .allMatch(RowPredicates.hasColumnContaining(EColumn.KEY.name, key))
         .allMatch(RowPredicates.hasColumnContaining(EColumn.DATA.name, value))

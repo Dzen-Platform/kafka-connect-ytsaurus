@@ -4,17 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.assertj.core.api.ListAssert;
+import org.assertj.core.api.ObjectAssert;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig;
+import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.TableReader;
 import tech.ytsaurus.client.YTsaurusClient;
 import tech.ytsaurus.client.request.ExistsNode;
-import tech.ytsaurus.client.request.Format;
 import tech.ytsaurus.client.request.GetNode;
 import tech.ytsaurus.client.request.ReadTable;
+import tech.ytsaurus.client.request.SelectRowsRequest;
 import tech.ytsaurus.client.request.SerializationContext;
+import tech.ytsaurus.client.request.StartTransaction;
 import tech.ytsaurus.client.rpc.YTsaurusClientAuth;
 import tech.ytsaurus.core.cypress.YPath;
 import tech.ytsaurus.core.rows.YTreeMapNodeSerializer;
@@ -89,18 +92,12 @@ public abstract class BaseYtsaurusConnectorIntegrationTest extends BaseConnector
             String.format("Expected node %s exists, but has not", nodePath)
         );
       }
-
-      public void valueEquals(YTreeNode expected) {
+      public ObjectAssert<YTreeNode> is() {
         GetNode getNodeReq = GetNode.builder()
             .setPath(nodePath)
             .build();
-        YTreeNode actual = ytsaurusClient.getNode(getNodeReq).join();
-        Assertions.assertEquals(
-            expected,
-            actual,
-            String.format("Expected value of the node %s equal to %s but got %s",
-                nodePath, expected, actual)
-        );
+        YTreeNode node = ytsaurusClient.getNode(getNodeReq).join();
+        return new ObjectAssert<>(node);
       }
     }
   }
@@ -127,6 +124,10 @@ public abstract class BaseYtsaurusConnectorIntegrationTest extends BaseConnector
           ytsaurusClient, YPath.simple(dir).child(dirContent.asMap().keySet().iterator().next()));
     }
 
+    public DynamicTableAssertions dynamicTableWithPath(String path) {
+      return new DynamicTableAssertions(ytsaurusClient, YPath.simple(path));
+    }
+
     public static class StaticTableAssertions {
       private final YTsaurusClient ytsaurusClient;
       private final YPath tablePath;
@@ -139,7 +140,7 @@ public abstract class BaseYtsaurusConnectorIntegrationTest extends BaseConnector
         ReadTable<YTreeMapNode> readTableReq = ReadTable.<YTreeMapNode>builder()
             .setPath(tablePath)
             .setSerializationContext(
-                new SerializationContext<>(new YTreeMapNodeSerializer(), Format.ysonBinary()))
+                new SerializationContext<>(new YTreeMapNodeSerializer()))
             .build();
         TableReader<YTreeMapNode> tableReader = ytsaurusClient.readTable(readTableReq).join();
         try {
@@ -170,6 +171,35 @@ public abstract class BaseYtsaurusConnectorIntegrationTest extends BaseConnector
           throw new RuntimeException(e);
         } finally {
           tableReader.close().join();
+        }
+      }
+    }
+
+    public static class DynamicTableAssertions {
+      private final YTsaurusClient ytsaurusClient;
+      private final YPath tablePath;
+
+      public DynamicTableAssertions(YTsaurusClient ytsaurusClient, YPath tablePath) {
+        this.ytsaurusClient = ytsaurusClient;
+        this.tablePath = tablePath;
+      }
+
+      public void exists() {
+        Assertions.assertTrue(
+            selectAllRows() != null, String.format("Expected readable table %s", tablePath));
+      }
+
+      public ListAssert<YTreeMapNode> rows() {
+        return new ListAssert<>(selectAllRows());
+      }
+
+      private List<YTreeMapNode> selectAllRows() {
+        ApiServiceTransaction tx = ytsaurusClient.startTransaction(StartTransaction.tablet()).join();
+        SelectRowsRequest select = SelectRowsRequest.of(String.format("* from [%s]", tablePath));
+        try {
+          return tx.selectRows(select, new YTreeMapNodeSerializer()).join();
+        } finally {
+          tx.commit().join();
         }
       }
     }
