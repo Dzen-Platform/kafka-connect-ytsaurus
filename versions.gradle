@@ -6,4 +6,7 @@ ext {
     slf4jVersion = '2.0.6'
     junitJupiterVersion = '5.9.2'
     mockitoCoreVersion = '4.10.0'
+    testcontainersVersion = '1.18.3'
+    awaitilityVersion = '4.2.0'
+    assertjVersion = '3.24.2'
 }

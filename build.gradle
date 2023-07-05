@@ -38,6 +38,10 @@ dependencies {
     testImplementation ("org.apache.kafka:kafka_$kafkaScalaVersion:$kafkaVersion")
     testImplementation ("org.apache.kafka:kafka_$kafkaScalaVersion:$kafkaVersion:test")
     testImplementation ("org.apache.kafka:kafka-clients:$kafkaVersion:test")
+    testImplementation "org.testcontainers:testcontainers:$testcontainersVersion"
+    testImplementation "org.testcontainers:junit-jupiter:$testcontainersVersion"
+    testImplementation "org.awaitility:awaitility:$awaitilityVersion"
+    testImplementation "org.assertj:assertj-core:$assertjVersion"
 }
 
 test {
