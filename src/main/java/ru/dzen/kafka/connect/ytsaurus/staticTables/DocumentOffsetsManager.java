@@ -26,7 +26,7 @@ public class DocumentOffsetsManager extends BaseOffsetsManager {
   }
 
   @Override
-  public Map<TopicPartition, OffsetAndMetadata> getPrevOffsets(ApiServiceTransaction trx,
+  public Map<TopicPartition, OffsetAndMetadata> getCommittedOffsets(ApiServiceTransaction trx,
       Set<TopicPartition> topicPartitions) throws InterruptedException, ExecutionException {
     var res = new HashMap<TopicPartition, OffsetAndMetadata>();
     for (var topicPartition : topicPartitions) {

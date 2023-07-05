@@ -12,12 +12,12 @@ import tech.ytsaurus.client.ApiServiceTransaction;
 public abstract class BaseOffsetsManager {
 
   public Collection<SinkRecord> filterRecords(Collection<SinkRecord> sinkRecords,
-      Map<TopicPartition, OffsetAndMetadata> prevOffsetsMap) {
+      Map<TopicPartition, OffsetAndMetadata> committedOffsets) {
     return sinkRecords.stream()
         .filter(record -> {
           var topicPartition = new TopicPartition(record.topic(), record.kafkaPartition());
-          return !prevOffsetsMap.containsKey(topicPartition)
-              || prevOffsetsMap.get(topicPartition).offset() < record.kafkaOffset();
+          return !committedOffsets.containsKey(topicPartition)
+              || committedOffsets.get(topicPartition).offset() < record.kafkaOffset();
         })
         .collect(Collectors.toList());
   }
@@ -31,7 +31,7 @@ public abstract class BaseOffsetsManager {
         ));
   }
 
-  public abstract Map<TopicPartition, OffsetAndMetadata> getPrevOffsets(ApiServiceTransaction trx,
+  public abstract Map<TopicPartition, OffsetAndMetadata> getCommittedOffsets(ApiServiceTransaction trx,
       Set<TopicPartition> topicPartitions)
       throws InterruptedException, java.util.concurrent.ExecutionException;
 

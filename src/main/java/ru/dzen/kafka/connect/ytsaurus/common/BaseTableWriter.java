@@ -59,17 +59,18 @@ public abstract class BaseTableWriter {
   }
 
   public Map<TopicPartition, OffsetAndMetadata> getSafeToCommitOffsets(
-      Map<TopicPartition, OffsetAndMetadata> unsafeOffsets) throws Exception {
-    return offsetsManager.getPrevOffsets(createTransaction(), unsafeOffsets.keySet()).entrySet()
+      Map<TopicPartition, OffsetAndMetadata> currentOffsets) throws Exception {
+    return offsetsManager.getCommittedOffsets(createTransaction(), currentOffsets.keySet())
+        .entrySet()
         .stream()
-        .filter(entry -> unsafeOffsets.containsKey(entry.getKey()))
+        .filter(entry -> currentOffsets.containsKey(entry.getKey()))
         .map(entry -> {
           var topicPartition = entry.getKey();
-          var prevOffset = entry.getValue();
-          var unsafeOffset = unsafeOffsets.get(topicPartition);
-          return unsafeOffset.offset() >= prevOffset.offset() ?
-              Map.entry(topicPartition, prevOffset) :
-              Map.entry(topicPartition, unsafeOffset);
+          var committedOffset = entry.getValue();
+          var currentOffset = currentOffsets.get(topicPartition);
+          return currentOffset.offset() >= committedOffset.offset() ?
+              Map.entry(topicPartition, committedOffset) :
+              Map.entry(topicPartition, currentOffset);
         })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
@@ -197,9 +198,8 @@ public abstract class BaseTableWriter {
     try (var trx = createTransaction()) {
       var maxOffsets = offsetsManager.getMaxOffsets(records);
       offsetsManager.lockPartitions(trx, maxOffsets.keySet());
-      var prevOffsets = offsetsManager.getPrevOffsets(trx,
-          maxOffsets.keySet());
-      var filteredRecords = offsetsManager.filterRecords(records, prevOffsets);
+      var committedOffsets = offsetsManager.getCommittedOffsets(trx, maxOffsets.keySet());
+      var filteredRecords = offsetsManager.filterRecords(records, committedOffsets);
       if (filteredRecords.isEmpty()) {
         trx.close();
       } else {
