@@ -23,7 +23,7 @@ public class UnstructuredTableIntegrationTest extends BaseYtsaurusConnectorInteg
   private static final String ytsaurusOutputDirectory =
       String.format("//home/%s/test", topic);
   private static final String offsetsPath =
-      String.format("%s/__connect_sink_metadata__/offsets/%s-0", ytsaurusOutputDirectory, topic);
+      String.format("%s/__connect_sink_metadata__/offsets/0", ytsaurusOutputDirectory);
   private static final String outputTableDir =
       String.format("%s/output", ytsaurusOutputDirectory);
   private static final String key = "123";
