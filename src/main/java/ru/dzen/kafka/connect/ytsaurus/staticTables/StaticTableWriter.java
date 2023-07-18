@@ -66,8 +66,8 @@ public class StaticTableWriter extends BaseTableWriter {
   protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records,
       Set<TopicPartition> topicPartitions)
       throws Exception {
-    var mapNodesToWrite = recordsToRows(records);
-    var rows = mapNodesToWrite.stream().map(x -> (YTreeMapNode) YTree.node(x))
+    var tableRows = recordsToRows(records);
+    var rows = tableRows.stream().map(x -> (YTreeMapNode) YTree.node(x.asMap()))
         .collect(Collectors.toList());
 
     var inferredSchemaBuilder = new InferredSchemaBuilder();

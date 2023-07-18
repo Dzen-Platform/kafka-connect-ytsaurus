@@ -31,8 +31,8 @@ public class DynTableWriter extends BaseTableWriter {
         .setPath(config.getDataQueueTablePath().toString())
         .setSchema(UnstructuredTableSchema.createDataQueueTableSchema(config.getKeyOutputFormat(),
             config.getValueOutputFormat(), EColumn.getAllMetadataColumns(ETableType.DYNAMIC)));
-    var mapNodesToWrite = recordsToRows(records);
-    mapNodesToWrite.forEach(mapNodeToWrite -> modifyRowsRequestBuilder.addUpdate(mapNodeToWrite));
+    var tableRows = recordsToRows(records);
+    tableRows.forEach(row -> modifyRowsRequestBuilder.addUpdate(row.asMap()));
     trx.modifyRows(modifyRowsRequestBuilder.build()).get();
   }
 
