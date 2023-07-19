@@ -23,6 +23,7 @@ apply from: 'versions.gradle'
 dependencies {
     implementation "org.apache.kafka:connect-api:$kafkaVersion"
     implementation "org.apache.kafka:connect-json:$kafkaVersion"
+    implementation "org.apache.kafka:connect-transforms:$kafkaVersion"
     implementation "org.apache.kafka:kafka-clients:$kafkaVersion"
     implementation "org.apache.kafka:kafka-streams:$kafkaVersion"
     implementation "tech.ytsaurus:ytsaurus-client:$ytVersion"

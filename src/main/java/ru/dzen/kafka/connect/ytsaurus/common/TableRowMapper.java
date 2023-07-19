@@ -40,51 +40,55 @@ class TableRowMapper {
     this.config = config;
   }
 
-  protected List<TableRow> recordsToRows(Collection<SinkRecord> records) {
+  List<TableRow> recordsToRows(Collection<SinkRecord> records) {
     var tableRows = new ArrayList<TableRow>();
     for (SinkRecord record : records) {
-      Builder rowBuilder = TableRow.builder();
-      try {
-        addRecordKeyColumns(rowBuilder, record);
-      } catch (Exception e) {
-        log.error("Exception in addRecordKeyColumns:", e);
-        throw new DataException(e);
-      }
-      try {
-        addRecordValueColumns(rowBuilder, record);
-      } catch (Exception e) {
-        log.error("Exception in addRecordValueColumns:", e);
-        throw new DataException(e);
-      }
-
-      rowBuilder.addValueColumn(
-          UnstructuredTableSchema.EColumn.TOPIC.name,
-          TiType.string(),
-          YTree.stringNode(record.topic())
-      );
-      rowBuilder.addValueColumn(
-          UnstructuredTableSchema.EColumn.PARTITION.name,
-          TiType.uint64(),
-          YTree.unsignedLongNode(record.kafkaPartition())
-      );
-      rowBuilder.addValueColumn(
-          UnstructuredTableSchema.EColumn.OFFSET.name,
-          TiType.uint64(),
-          YTree.unsignedLongNode(record.kafkaOffset())
-      );
-      rowBuilder.addValueColumn(
-          UnstructuredTableSchema.EColumn.TIMESTAMP.name,
-          TiType.uint64(),
-          YTree.unsignedLongNode(System.currentTimeMillis())
-      );
-      rowBuilder.addValueColumn(
-          UnstructuredTableSchema.EColumn.HEADERS.name,
-          TiType.list(TiType.list(TiType.string())),
-          buildHeaders(record)
-      );
-      tableRows.add(rowBuilder.build());
+      tableRows.add(recordToRow(record));
     }
     return tableRows;
+  }
+
+  TableRow recordToRow(SinkRecord record) {
+    Builder rowBuilder = TableRow.builder();
+    try {
+      addRecordKeyColumns(rowBuilder, record);
+    } catch (Exception e) {
+      log.error("Exception in addRecordKeyColumns:", e);
+      throw new DataException(e);
+    }
+    try {
+      addRecordValueColumns(rowBuilder, record);
+    } catch (Exception e) {
+      log.error("Exception in addRecordValueColumns:", e);
+      throw new DataException(e);
+    }
+
+    rowBuilder.addValueColumn(
+        UnstructuredTableSchema.EColumn.TOPIC.name,
+        TiType.string(),
+        YTree.stringNode(record.topic())
+    );
+    rowBuilder.addValueColumn(
+        UnstructuredTableSchema.EColumn.PARTITION.name,
+        TiType.uint64(),
+        YTree.unsignedLongNode(record.kafkaPartition())
+    );
+    rowBuilder.addValueColumn(
+        UnstructuredTableSchema.EColumn.OFFSET.name,
+        TiType.uint64(),
+        YTree.unsignedLongNode(record.kafkaOffset())
+    );
+    rowBuilder.addValueColumn(
+        UnstructuredTableSchema.EColumn.TIMESTAMP.name,
+        TiType.uint64(),
+        YTree.unsignedLongNode(System.currentTimeMillis())
+    );
+    rowBuilder.addValueColumn(
+        UnstructuredTableSchema.EColumn.HEADERS.name,
+        TiType.list(TiType.list(TiType.string())),
+        buildHeaders(record)
+    );
+    return rowBuilder.build();
   }
 
   private void addRecordKeyColumns(TableRow.Builder rowBuilder, SinkRecord record)
