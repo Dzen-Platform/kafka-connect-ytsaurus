@@ -1,12 +1,12 @@
 package ru.dzen.kafka.connect.ytsaurus.common;
 
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import tech.ytsaurus.core.tables.TableSchema;
+import tech.ytsaurus.core.tables.TableSchema.Builder;
 import tech.ytsaurus.typeinfo.TiType;
 
 public final class UnstructuredTableSchema {
@@ -28,6 +28,25 @@ public final class UnstructuredTableSchema {
     if (valueOutputFormat != null) {
       builder.addValue(EColumn.DATA.name, valueOutputFormat.toTiType());
     }
+    addMetadataColumns(metadataColumns, builder);
+
+    return builder.build();
+  }
+
+  public static TableSchema createSortedTableSchema(
+      BaseTableWriterConfig.OutputFormat keyOutputFormat,
+      BaseTableWriterConfig.OutputFormat valueOutputFormat,
+      Map<EColumn, String> metadataColumns) {
+    var builder = TableSchema.builder()
+        .setUniqueKeys(true);
+    builder.addKey(EColumn.KEY.name, keyOutputFormat.toTiType());
+    builder.addValue(EColumn.DATA.name, valueOutputFormat.toTiType());
+    addMetadataColumns(metadataColumns, builder);
+
+    return builder.build();
+  }
+
+  private static void addMetadataColumns(Map<EColumn, String> metadataColumns, Builder builder) {
     if (metadataColumns.containsKey(EColumn.TOPIC)) {
       builder.addValue(metadataColumns.get(EColumn.TOPIC), TiType.string());
     }
@@ -43,8 +62,6 @@ public final class UnstructuredTableSchema {
     if (metadataColumns.containsKey(EColumn.HEADERS)) {
       builder.addValue(metadataColumns.get(EColumn.HEADERS), TiType.optional(TiType.yson()));
     }
-
-    return builder.build();
   }
 
   public enum ETableType {

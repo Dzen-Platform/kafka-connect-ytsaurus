@@ -32,7 +32,7 @@ public class DynTableWriter extends BaseTableWriter {
     this.config = config;
     this.operationExtractor = new ExtractField.Value<>();
     final Map<String, String> operationExtractorConfig = new HashMap<>();
-    operationExtractorConfig.put("field", "op");
+    operationExtractorConfig.put("field", config.getOperationField());
     operationExtractor.configure(operationExtractorConfig);
   }
 

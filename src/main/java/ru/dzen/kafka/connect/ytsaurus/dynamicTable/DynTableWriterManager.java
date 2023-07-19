@@ -11,6 +11,7 @@ import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.ETableType;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.UpdateMode;
 import tech.ytsaurus.client.YTsaurusClient;
 import tech.ytsaurus.client.request.CreateNode;
 import tech.ytsaurus.client.request.MountTable;
@@ -93,9 +94,7 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
       throw new RetriableException(e);
     }
     try {
-      var dataQueueTableSchema = UnstructuredTableSchema.createDataQueueTableSchema(
-          config.getKeyOutputFormat(), config.getValueOutputFormat(),
-          EColumn.getAllMetadataColumns(ETableType.DYNAMIC));
+      var dataQueueTableSchema = getDyntableSchema();
 
       var desiredExtraAttributesWithTabletCount = new HashMap<>(config.getExtraQueueAttributes());
       desiredExtraAttributesWithTabletCount.put("tablet_count",
@@ -118,5 +117,17 @@ public class DynTableWriterManager extends DynTableWriter implements TableWriter
   @Override
   public void stop() {
 
+  }
+
+  private TableSchema getDyntableSchema() {
+    return config.getUpdateMode() == UpdateMode.CRUD
+        ? UnstructuredTableSchema.createSortedTableSchema(
+            config.getKeyOutputFormat(),
+            config.getValueOutputFormat(),
+            EColumn.getAllMetadataColumns(ETableType.DYNAMIC))
+        : UnstructuredTableSchema.createDataQueueTableSchema(
+            config.getKeyOutputFormat(),
+            config.getValueOutputFormat(),
+            EColumn.getAllMetadataColumns(ETableType.DYNAMIC));
   }
 }
