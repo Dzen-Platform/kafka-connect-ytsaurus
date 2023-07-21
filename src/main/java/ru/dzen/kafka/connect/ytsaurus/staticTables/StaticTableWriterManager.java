@@ -58,7 +58,8 @@ public class StaticTableWriterManager extends StaticTableWriter implements Table
               .get().asList();
           for (var table : allTables) {
             if (table.getAttribute("final").isPresent() || config.getOutputTablesDirectory()
-                .child(table.stringValue()).toString().compareTo(currentTablePath.toString()) >= 0) {
+                .child(table.stringValue()).toString().compareTo(currentTablePath.toString())
+                >= 0) {
               continue;
             }
             var tablePath = config.getOutputTablesDirectory().child(table.stringValue());
