@@ -10,7 +10,7 @@ repositories {
 
 description = "kafka-connect-ytsaurus"
 group 'ru.dzen.kafka.connect.ytsaurus'
-version '1.1.15'
+version '1.1.16'
 
 apply from: 'versions.gradle'
 
