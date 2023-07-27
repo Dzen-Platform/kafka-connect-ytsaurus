@@ -23,24 +23,11 @@ public final class UnstructuredTableSchema {
     var builder = TableSchema.builder()
         .setUniqueKeys(false);
     if (keyOutputFormat != null) {
-      builder.addValue(EColumn.KEY.name, keyOutputFormat.toTiType());
+      builder.addValue(EColumn.KEY.name, TiType.optional(keyOutputFormat.toTiType()));
     }
     if (valueOutputFormat != null) {
-      builder.addValue(EColumn.DATA.name, valueOutputFormat.toTiType());
+      builder.addValue(EColumn.DATA.name, TiType.optional(valueOutputFormat.toTiType()));
     }
-    addMetadataColumns(metadataColumns, builder);
-
-    return builder.build();
-  }
-
-  public static TableSchema createSortedTableSchema(
-      BaseTableWriterConfig.OutputFormat keyOutputFormat,
-      BaseTableWriterConfig.OutputFormat valueOutputFormat,
-      Map<EColumn, String> metadataColumns) {
-    var builder = TableSchema.builder()
-        .setUniqueKeys(true);
-    builder.addKey(EColumn.KEY.name, keyOutputFormat.toTiType());
-    builder.addValue(EColumn.DATA.name, valueOutputFormat.toTiType());
     addMetadataColumns(metadataColumns, builder);
 
     return builder.build();

@@ -90,20 +90,20 @@ public class Util {
   public static TiType getTypeOfNode(YTreeNode node) {
     if (node.isListNode()) {
       return node.asList().isEmpty()
-          ? TiType.list(TiType.nullType())
-          : TiType.list(getTypeOfNode(node.asList().get(0)));
+          ? TiType.optional(TiType.list(TiType.nullType()))
+          : TiType.optional(TiType.list(getTypeOfNode(node.asList().get(0))));
     } else if (node.isStringNode()) {
-      return TiType.string();
+      return TiType.optional(TiType.string());
     } else if (node.isIntegerNode()) {
-      return TiType.int64();
+      return TiType.optional(TiType.int64());
     } else if (node.isDoubleNode()) {
-      return TiType.doubleType();
+      return TiType.optional(TiType.doubleType());
     } else if (node.isBooleanNode()) {
-      return TiType.bool();
+      return TiType.optional(TiType.bool());
     } else if (node.isEntityNode()) {
-      return TiType.nullType();
+      return TiType.optional(TiType.nullType());
     } else {
-      return TiType.yson();
+      return TiType.optional(TiType.yson());
     }
   }
 

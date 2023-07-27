@@ -12,7 +12,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.AuthType;
-import ru.dzen.kafka.connect.ytsaurus.table.TableRow;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.YTsaurusClient;
 import tech.ytsaurus.client.YTsaurusClientConfig;
@@ -24,7 +24,7 @@ public abstract class BaseTableWriter {
   protected final YTsaurusClient client;
   protected final BaseOffsetsManager offsetsManager;
   protected final BaseTableWriterConfig config;
-  private final TableRowMapper tableRowMapper;
+  protected final TableRowMapper tableRowMapper;
 
   protected BaseTableWriter(BaseTableWriterConfig config, BaseOffsetsManager offsetsManager) {
     this.config = config;
@@ -33,7 +33,8 @@ public abstract class BaseTableWriter {
             .setTvmOnly(config.getAuthType().equals(AuthType.SERVICE_TICKET)).build())
         .setCluster(config.getYtCluster()).setAuth(config.getYtClientAuth()).build();
     this.offsetsManager = offsetsManager;
-    this.tableRowMapper = new TableRowMapper(config);
+    this.tableRowMapper = config.getConfiguredInstance(
+        BaseTableWriterConfig.ROW_MAPPER_CLASS, TableRowMapper.class);
   }
 
   protected ApiServiceTransaction createTransaction() throws Exception {

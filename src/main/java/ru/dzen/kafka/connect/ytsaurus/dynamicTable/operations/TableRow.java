@@ -1,4 +1,4 @@
-package ru.dzen.kafka.connect.ytsaurus.table;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
 
 import java.util.ArrayList;
 import java.util.HashMap;

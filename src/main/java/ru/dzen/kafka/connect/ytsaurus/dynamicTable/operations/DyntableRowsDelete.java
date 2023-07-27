@@ -1,4 +1,4 @@
-package ru.dzen.kafka.connect.ytsaurus.table;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
 
 import java.util.List;
 import tech.ytsaurus.client.ApiServiceTransaction;
@@ -10,25 +10,25 @@ import tech.ytsaurus.core.tables.TableSchema;
 /**
  * @author pbk-vitaliy
  */
-public class DyntableRowsUpdate implements Update {
+public class DyntableRowsDelete implements TableOperation {
   private final YPath tablePath;
-  private final List<TableRow> updatedRows;
+  private final List<TableRow> deletedRows;
 
-  public DyntableRowsUpdate(YPath tablePath, List<TableRow> updatedRows) {
+  public DyntableRowsDelete(YPath tablePath, List<TableRow> deletedRows) {
     this.tablePath = tablePath;
-    this.updatedRows = updatedRows;
+    this.deletedRows = deletedRows;
   }
 
   @Override
   public void execute(ApiServiceTransaction tx) {
-    if (updatedRows.isEmpty()) {
+    if (deletedRows.isEmpty()) {
       return;
     }
-    TableSchema tableSchema = updatedRows.get(0).getSchema();
+    TableSchema tableSchema = deletedRows.get(0).getSchema();
     Builder requestBuilder = ModifyRowsRequest.builder()
         .setPath(tablePath.toString())
         .setSchema(tableSchema);
-    updatedRows.forEach(row -> requestBuilder.addUpdate(row.asMap()));
+    deletedRows.forEach(row -> requestBuilder.addDelete(row.getKey()));
     tx.modifyRows(requestBuilder.build()).join();
   }
 }

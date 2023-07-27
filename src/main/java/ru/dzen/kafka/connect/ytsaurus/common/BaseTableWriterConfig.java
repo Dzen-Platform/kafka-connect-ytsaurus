@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.Importance;
+import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
 import tech.ytsaurus.client.rpc.YTsaurusClientAuth;
@@ -27,6 +29,7 @@ public class BaseTableWriterConfig extends AbstractConfig {
   public static final String OUTPUT_DIRECTORY = "yt.sink.output.directory";
   public static final String OUTPUT_TTL = "yt.sink.output.ttl";
   public static final String METADATA_DIRECTORY_NAME = "yt.sink.metadata.directory.name";
+  public static final String ROW_MAPPER_CLASS = "yt.sink.row.mapper.class";
 
   public static ConfigDef CONFIG_DEF = new ConfigDef()
       .define(AUTH_TYPE, ConfigDef.Type.STRING, AuthType.TOKEN.name(),
@@ -56,10 +59,12 @@ public class BaseTableWriterConfig extends AbstractConfig {
           "Determines the output format for values: 'string' for plain string values or 'any' for values with no specific format")
       .define(OUTPUT_TABLE_SCHEMA_TYPE, ConfigDef.Type.STRING,
           OutputTableSchemaType.UNSTRUCTURED.name(),
-          ValidUpperString.in(OutputTableSchemaType.UNSTRUCTURED.name(),
-              OutputTableSchemaType.STRICT.name(), OutputTableSchemaType.WEAK.name()),
+          ValidUpperString.in(
+              OutputTableSchemaType.UNSTRUCTURED.name(),
+              OutputTableSchemaType.STRICT.name(),
+              OutputTableSchemaType.WEAK.name()),
           ConfigDef.Importance.HIGH,
-          "Defines the schema type for output tables: 'unstructured' for schema-less tables, 'strict' for tables with a fixed schema, or 'weak' for tables with a flexible schema")
+          "Defines the schema type for output tables: 'unstructured' for schema-less tables, 'strict' for tables with a fixed schema or 'weak' for tables with a flexible schema")
       .define(OUTPUT_DIRECTORY, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE,
           new YPathValidator(), ConfigDef.Importance.HIGH,
           "Specifies the directory path for storing the output data")
@@ -67,9 +72,11 @@ public class BaseTableWriterConfig extends AbstractConfig {
           ConfigDef.Importance.MEDIUM, "Suffix for the metadata directory used by the system")
       .define(OUTPUT_TTL, ConfigDef.Type.STRING, "30d", new DurationValidator(),
           ConfigDef.Importance.MEDIUM,
-          "Time-to-live (TTL) for output tables or rows, specified as a duration (e.g., '30d' for 30 days)");
+          "Time-to-live (TTL) for output tables or rows, specified as a duration (e.g., '30d' for 30 days)")
+      .define(ROW_MAPPER_CLASS, Type.CLASS, UnstructuredSchemaTableRowMapper.class,
+          ConfigDef.Importance.HIGH, "Defines the mapper class which will be used to transform sink records to ytsaurus table rows");
 
-  public BaseTableWriterConfig(ConfigDef configDef, Map<String, String> originals) {
+  public BaseTableWriterConfig(ConfigDef configDef, Map<String, ?> originals) {
     super(configDef, originals);
 
     if (getAuthType() == AuthType.SERVICE_TICKET && getPassword(SERVICE_TICKET_PROVIDER_URL).value()
@@ -82,7 +89,7 @@ public class BaseTableWriterConfig extends AbstractConfig {
     }
   }
 
-  public BaseTableWriterConfig(Map<String, String> originals) {
+  public BaseTableWriterConfig(Map<String, ?> originals) {
     super(CONFIG_DEF, originals);
   }
 

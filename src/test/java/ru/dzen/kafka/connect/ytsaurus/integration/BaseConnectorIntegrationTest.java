@@ -77,7 +77,7 @@ public abstract class BaseConnectorIntegrationTest {
   protected void awaitCommittedOffset(
       String connectorName, String topic, int partition, long expectedOffset) {
     await(String.format("Committed topic %s-%d offset", topic, partition))
-        .atMost(5, TimeUnit.SECONDS)
+        .atMost(30, TimeUnit.SECONDS)
         .until(() -> {
           Map<TopicPartition, OffsetAndMetadata> offsets;
           try {

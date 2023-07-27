@@ -5,20 +5,33 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.transforms.ExtractField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriter;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.UpdateMode;
-import ru.dzen.kafka.connect.ytsaurus.table.DyntableRowsDelete;
-import ru.dzen.kafka.connect.ytsaurus.table.DyntableRowsInsert;
-import ru.dzen.kafka.connect.ytsaurus.table.DyntableRowsUpdate;
-import ru.dzen.kafka.connect.ytsaurus.table.Operation;
-import ru.dzen.kafka.connect.ytsaurus.table.Update;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.TableType;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.RecordRouter.Destination;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableCreate;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableRowsDelete;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableRowsInsert;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableRowsUpdate;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableSchemaUpdate;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.Operation;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableOperation;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
+import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableSchemaRead;
+import tech.ytsaurus.client.ApiServiceClient;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.request.StartTransaction;
+import tech.ytsaurus.client.request.TransactionType;
+import tech.ytsaurus.core.cypress.YPath;
+import tech.ytsaurus.core.tables.ColumnSchema;
+import tech.ytsaurus.core.tables.TableSchema;
 
 public class DynTableWriter extends BaseTableWriter {
 
@@ -26,6 +39,7 @@ public class DynTableWriter extends BaseTableWriter {
 
   public final DynTableWriterConfig config;
   private final ExtractField.Value<SinkRecord> operationExtractor;
+  private final RecordRouter recordRouter;
 
   public DynTableWriter(DynTableWriterConfig config) {
     super(config, new DynTableOffsetsManager(config.getOffsetsTablePath()));
@@ -34,6 +48,7 @@ public class DynTableWriter extends BaseTableWriter {
     final Map<String, String> operationExtractorConfig = new HashMap<>();
     operationExtractorConfig.put("field", config.getOperationField());
     operationExtractor.configure(operationExtractorConfig);
+    this.recordRouter = new RecordRouter(config);
   }
 
   @Override
@@ -42,26 +57,74 @@ public class DynTableWriter extends BaseTableWriter {
     if (records.isEmpty()) {
       return;
     }
+    if (config.isTableRouterEnabled()) {
+      List<Destination> destinations = recordRouter.route(records);
+      for (Destination dst : destinations) {
+        doWriteRows(trx, dst.getDestinationPath(), dst.getRecords());
+      }
+    } else {
+      doWriteRows(trx, config.getDataQueueTablePath(), records);
+    }
+  }
 
+  private void doWriteRows(
+      ApiServiceTransaction tx,
+      YPath tablePath,
+      Collection<SinkRecord> records) {
+    if (records.isEmpty()) {
+      return;
+    }
+    TableSchema currentSchema = null;
     Operation currentOperation = null;
-    List<SinkRecord> affectedRecords = new ArrayList<>();
+    List<TableRow> affectedRows = new ArrayList<>();
     for (SinkRecord record : records) {
+      TableRow tableRow = tableRowMapper.recordToRow(record);
+      if (currentSchema == null) {
+        currentSchema = getInTransaction(tx.getClient(), TransactionType.Master, t -> {
+          if (!t.existsNode(tablePath.toString()).join()) {
+            DyntableCreate dyntableCreate = new DyntableCreate(
+                config.getTableType(),
+                tablePath,
+                tableRow.getSchema(),
+                config.getTableExtraAttributes());
+            dyntableCreate.execute(t);
+          }
+          TableSchemaRead schemaReadOp = new TableSchemaRead(tablePath);
+          schemaReadOp.execute(t);
+          return schemaReadOp.getSchema();
+        });
+        DyntableUtils.mountTable(client, tablePath);
+      }
+      if (schemaUpdateRequired(currentSchema, tableRow.getSchema())) {
+        if (currentOperation != null && !affectedRows.isEmpty()) {
+          TableOperation update = createUpdate(currentOperation, tablePath, affectedRows);
+          runInTransaction(tx.getClient(), TransactionType.Tablet, update::execute);
+          currentOperation = null;
+          affectedRows.clear();
+        }
+        DyntableSchemaUpdate schemaUpdate = new DyntableSchemaUpdate(
+            config.getTableType(), tablePath, currentSchema, tableRow);
+        currentSchema = getInTransaction(tx.getClient(), TransactionType.Master, t -> {
+          schemaUpdate.execute(t);
+          return schemaUpdate.getCurrentSchema();
+        });
+      }
       Operation operation = getOperationType(record);
       if (currentOperation == null) {
         currentOperation = operation;
       }
       if (currentOperation == operation) {
-        affectedRecords.add(record);
+        affectedRows.add(tableRow);
         continue;
       }
-      Update update = createUpdate(currentOperation, affectedRecords);
-      update.execute(trx);
+      TableOperation update = createUpdate(currentOperation, tablePath, affectedRows);
+      runInTransaction(tx.getClient(), TransactionType.Tablet, update::execute);
       currentOperation = operation;
-      affectedRecords.clear();
-      affectedRecords.add(record);
+      affectedRows.clear();
+      affectedRows.add(tableRow);
     }
-    Update update = createUpdate(currentOperation, affectedRecords);
-    update.execute(trx);
+    TableOperation update = createUpdate(currentOperation, tablePath, affectedRows);
+    runInTransaction(tx.getClient(), TransactionType.Tablet, update::execute);
   }
 
   @Override
@@ -74,23 +137,65 @@ public class DynTableWriter extends BaseTableWriter {
     return new DynTableWriterManager(config);
   }
 
-  private Operation getOperationType(SinkRecord record) {
-    if (config.getUpdateMode() == UpdateMode.INSERTS) {
-      return Operation.CREATE;
-    }
-    String operationLiteral = operationExtractor.apply(record).value().toString();
-    return Operation.byLiteral(operationLiteral).orElseThrow();
+  private void runInTransaction(
+      ApiServiceClient client,
+      TransactionType txType,
+      Consumer<ApiServiceTransaction> txConsumer)
+  {
+    getInTransaction(client, txType, t -> {
+      txConsumer.accept(t);
+      return null;
+    });
   }
 
-  private Update createUpdate(Operation operation, List<SinkRecord> affectedRecords) {
+  private <T> T getInTransaction(
+      ApiServiceClient client,
+      TransactionType txType,
+      Function<ApiServiceTransaction, T> getFunction) {
+    StartTransaction txReq = StartTransaction.builder()
+        .setType(txType)
+        .setSticky(txType == TransactionType.Tablet)
+        .build();
+    T result;
+    try (ApiServiceTransaction tx = client.startTransaction(txReq).join()) {
+      result = getFunction.apply(tx);
+      tx.commit().join();
+    }
+    return result;
+  }
+
+  private boolean schemaUpdateRequired(TableSchema currentSchema, TableSchema rowSchema) {
+    for (ColumnSchema col : rowSchema.getColumns()) {
+      int colIdx = currentSchema.findColumn(col.getName());
+      if (colIdx == -1
+          || !currentSchema.getColumnSchema(colIdx).getTypeV3().equals(col.getTypeV3())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Operation getOperationType(SinkRecord record) {
+    if (config.getTableType() == TableType.ORDERED) {
+      return Operation.CREATE;
+    }
+    return Optional.ofNullable(operationExtractor.apply(record))
+        .map(SinkRecord::value)
+        .map(Object::toString)
+        .flatMap(Operation::byLiteral)
+        .orElse(Operation.UPDATE);
+  }
+
+  private TableOperation createUpdate(
+      Operation operation, YPath tablePath, List<TableRow> affectedRows) {
     switch (operation) {
       case CREATE:
       case READ:
-        return createInsertRowsUpdate(affectedRecords);
+        return createInsertRowsUpdate(tablePath, affectedRows);
       case UPDATE:
-        return createUpdateRowsUpdate(affectedRecords);
+        return createUpdateRowsUpdate(tablePath, affectedRows);
       case DELETE:
-        return createDeleteRowsUpdate(affectedRecords);
+        return createDeleteRowsUpdate(tablePath, affectedRows);
       default:
         throw new UnsupportedOperationException(
             String.format("Operation type %s is not supported", operation)
@@ -98,15 +203,15 @@ public class DynTableWriter extends BaseTableWriter {
     }
   }
 
-  private Update createInsertRowsUpdate(List<SinkRecord> affectedRecords) {
-    return new DyntableRowsInsert(config.getDataQueueTablePath(), recordsToRows(affectedRecords));
+  private TableOperation createInsertRowsUpdate(YPath tablePath, List<TableRow> tableRows) {
+    return new DyntableRowsInsert(tablePath, tableRows);
   }
 
-  private Update createUpdateRowsUpdate(List<SinkRecord> affectedRecords) {
-    return new DyntableRowsUpdate(config.getDataQueueTablePath(), recordsToRows(affectedRecords));
+  private TableOperation createUpdateRowsUpdate(YPath tablePath, List<TableRow> tableRows) {
+    return new DyntableRowsUpdate(tablePath, tableRows);
   }
 
-  private Update createDeleteRowsUpdate(List<SinkRecord> affectedRecords) {
-    return new DyntableRowsDelete(config.getDataQueueTablePath(), recordsToRows(affectedRecords));
+  private TableOperation createDeleteRowsUpdate(YPath tablePath, List<TableRow> tableRows) {
+    return new DyntableRowsDelete(tablePath, tableRows);
   }
 }

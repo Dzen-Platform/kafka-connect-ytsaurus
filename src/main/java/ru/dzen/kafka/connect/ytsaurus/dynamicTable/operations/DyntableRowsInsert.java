@@ -1,4 +1,4 @@
-package ru.dzen.kafka.connect.ytsaurus.table;
+package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
 
 import java.util.List;
 import tech.ytsaurus.client.ApiServiceTransaction;
@@ -10,7 +10,7 @@ import tech.ytsaurus.core.tables.TableSchema;
 /**
  * @author pbk-vitaliy
  */
-public class DyntableRowsInsert implements Update {
+public class DyntableRowsInsert implements TableOperation {
   private final YPath tablePath;
   private final List<TableRow> rowsToInsert;
 
