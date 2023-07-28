@@ -1,9 +1,10 @@
-package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
+package ru.dzen.kafka.connect.ytsaurus.common;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import tech.ytsaurus.core.tables.ColumnSchema;
 import tech.ytsaurus.core.tables.ColumnSortOrder;
 import tech.ytsaurus.core.tables.TableSchema;
@@ -51,9 +52,15 @@ public class TableRow {
     private final List<ColumnSchema> columns = new ArrayList<>();
     private final Map<String, YTreeNode> keyMap = new HashMap<>();
     private final Map<String, YTreeNode> valueMap = new HashMap<>();
+    private ColumnSortOrder keyColumnsSortOrder;
+
+    public Builder setKeyColumnsSortOrder(@Nullable ColumnSortOrder columnSortOrder) {
+      keyColumnsSortOrder = columnSortOrder;
+      return this;
+    }
 
     public Builder addKeyColumn(String columnName, TiType type, YTreeNode value) {
-      columns.add(new ColumnSchema(columnName, type, ColumnSortOrder.ASCENDING));
+      columns.add(new ColumnSchema(columnName, type, keyColumnsSortOrder));
       keyMap.put(columnName, value);
       return this;
     }

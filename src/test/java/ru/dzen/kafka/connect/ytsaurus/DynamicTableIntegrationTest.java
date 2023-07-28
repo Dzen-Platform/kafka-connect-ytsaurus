@@ -17,7 +17,6 @@ import ru.dzen.kafka.connect.ytsaurus.common.FlattenedSchemaTableRowMapper;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredSchemaTableRowMapper;
 import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.TableType;
 import ru.dzen.kafka.connect.ytsaurus.integration.BaseYtsaurusConnectorIntegrationTest;
 import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig;
 import tech.ytsaurus.ysontree.YTreeMapNode;
@@ -216,36 +215,36 @@ public class DynamicTableIntegrationTest extends BaseYtsaurusConnectorIntegratio
     Map<String, String> props = baseSinkConnectorProps();
     props.put("value.converter.schemas.enable", "false");
     props.put(SinkConnectorConfig.TOPICS_CONFIG, connectorName);
-    props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_TABLE.name());
     props.put(BaseTableWriterConfig.OUTPUT_DIRECTORY, getOutputDir(connectorName));
     props.put(StaticTableWriterConfig.ROTATION_PERIOD, "5m");
 
     switch (connectorName) {
       case "ytsaurus-ordered-unstructured" -> {
-        props.put(DynTableWriterConfig.TABLE_TYPE, TableType.ORDERED.name());
+        props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_ORDERED_TABLES.name());
         props.put(BaseTableWriterConfig.ROW_MAPPER_CLASS,
             UnstructuredSchemaTableRowMapper.class.getName());
         props.put(BaseTableWriterConfig.KEY_OUTPUT_FORMAT, OutputFormat.STRING.name());
         props.put(BaseTableWriterConfig.VALUE_OUTPUT_FORMAT, OutputFormat.STRING.name());
       }
       case "ytsaurus-ordered-flattened" -> {
-        props.put(DynTableWriterConfig.TABLE_TYPE, TableType.ORDERED.name());
+        props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_ORDERED_TABLES.name());
         props.put(BaseTableWriterConfig.ROW_MAPPER_CLASS,
             FlattenedSchemaTableRowMapper.class.getName());
       }
       case "ytsaurus-sorted-unstructured", "ytsaurus-sorted-unstructured-ops" -> {
-        props.put(DynTableWriterConfig.TABLE_TYPE, TableType.SORTED.name());
+        props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_SORTED_TABLES.name());
         props.put(BaseTableWriterConfig.ROW_MAPPER_CLASS,
             UnstructuredSchemaTableRowMapper.class.getName());
         props.put(BaseTableWriterConfig.KEY_OUTPUT_FORMAT, OutputFormat.STRING.name());
         props.put(BaseTableWriterConfig.VALUE_OUTPUT_FORMAT, OutputFormat.STRING.name());
       }
       case "ytsaurus-sorted-flattened", "ytsaurus-sorted-flattened-ops" -> {
-        props.put(DynTableWriterConfig.TABLE_TYPE, TableType.SORTED.name());
+        props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_SORTED_TABLES.name());
         props.put(BaseTableWriterConfig.ROW_MAPPER_CLASS,
             FlattenedSchemaTableRowMapper.class.getName());
       }
       case "ytsaurus-table-routing" -> {
+        props.put(BaseTableWriterConfig.OUTPUT_TYPE, OutputType.DYNAMIC_ORDERED_TABLES.name());
         props.put(DynTableWriterConfig.TABLE_ROUTER_ENABLED, "true");
         props.put(DynTableWriterConfig.TABLE_ROUTER_FIELD, "_col");
       }

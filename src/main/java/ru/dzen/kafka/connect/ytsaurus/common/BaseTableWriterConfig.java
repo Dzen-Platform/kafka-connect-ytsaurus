@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
-import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
@@ -23,7 +22,6 @@ public class BaseTableWriterConfig extends AbstractConfig {
   public static final String SERVICE_TICKET_PROVIDER_URL = "yt.connection.service.ticket.provider.url";
   public static final String YT_CLUSTER = "yt.connection.cluster";
   public static final String OUTPUT_TYPE = "yt.sink.output.type";
-  public static final String OUTPUT_TABLE_SCHEMA_TYPE = "yt.sink.output.table.schema.type";
   public static final String KEY_OUTPUT_FORMAT = "yt.sink.output.key.format";
   public static final String VALUE_OUTPUT_FORMAT = "yt.sink.output.value.format";
   public static final String OUTPUT_DIRECTORY = "yt.sink.output.directory";
@@ -44,11 +42,11 @@ public class BaseTableWriterConfig extends AbstractConfig {
           "URL of the service ticket provider, required if 'yt.connection.auth.type' is 'SERVICE_TICKET'")
       .define(YT_CLUSTER, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH,
           "Identifier of the YT cluster to connect to")
-      .define(OUTPUT_TYPE, ConfigDef.Type.STRING, OutputType.DYNAMIC_TABLE.name(),
-          ValidUpperString.in(OutputType.DYNAMIC_TABLE.name(),
-              OutputType.STATIC_TABLES.name()),
+      .define(OUTPUT_TYPE, ConfigDef.Type.STRING, OutputType.DYNAMIC_ORDERED_TABLES.name(),
+          ValidUpperString.in(OutputType.DYNAMIC_ORDERED_TABLES.name(),
+              OutputType.DYNAMIC_SORTED_TABLES.name(), OutputType.STATIC_TABLES.name()),
           ConfigDef.Importance.HIGH,
-          "Specifies the output type: 'dynamic_table' for a sharded queue similar to Apache Kafka or 'static_tables' for separate time-based tables")
+          "Specifies the output type: 'dynamic_ordered_tables' for a sharded queue similar to Apache Kafka, 'dynamic_sorted_tables' for tables with rows ordered by keys (key can be composite: it can consist of several columns and it is unique) or 'static_tables' for separate time-based tables")
       .define(KEY_OUTPUT_FORMAT, ConfigDef.Type.STRING, OutputFormat.ANY.name(),
           ValidUpperString.in(OutputFormat.STRING.name(), OutputFormat.ANY.name()),
           ConfigDef.Importance.HIGH,
@@ -57,14 +55,6 @@ public class BaseTableWriterConfig extends AbstractConfig {
           ValidUpperString.in(OutputFormat.STRING.name(), OutputFormat.ANY.name()),
           ConfigDef.Importance.HIGH,
           "Determines the output format for values: 'string' for plain string values or 'any' for values with no specific format")
-      .define(OUTPUT_TABLE_SCHEMA_TYPE, ConfigDef.Type.STRING,
-          OutputTableSchemaType.UNSTRUCTURED.name(),
-          ValidUpperString.in(
-              OutputTableSchemaType.UNSTRUCTURED.name(),
-              OutputTableSchemaType.STRICT.name(),
-              OutputTableSchemaType.WEAK.name()),
-          ConfigDef.Importance.HIGH,
-          "Defines the schema type for output tables: 'unstructured' for schema-less tables, 'strict' for tables with a fixed schema or 'weak' for tables with a flexible schema")
       .define(OUTPUT_DIRECTORY, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE,
           new YPathValidator(), ConfigDef.Importance.HIGH,
           "Specifies the directory path for storing the output data")
@@ -107,10 +97,6 @@ public class BaseTableWriterConfig extends AbstractConfig {
 
   public OutputType getOutputType() {
     return OutputType.valueOf(getString(OUTPUT_TYPE).toUpperCase());
-  }
-
-  public OutputTableSchemaType getOutputTableSchemaType() {
-    return OutputTableSchemaType.valueOf(getString(OUTPUT_TABLE_SCHEMA_TYPE).toUpperCase());
   }
 
   public OutputFormat getKeyOutputFormat() {
@@ -162,7 +148,8 @@ public class BaseTableWriterConfig extends AbstractConfig {
   }
 
   public enum OutputType {
-    DYNAMIC_TABLE,
+    DYNAMIC_ORDERED_TABLES,
+    DYNAMIC_SORTED_TABLES,
     STATIC_TABLES
   }
 
@@ -180,12 +167,6 @@ public class BaseTableWriterConfig extends AbstractConfig {
           throw new IllegalArgumentException("Unsupported output format: " + this);
       }
     }
-  }
-
-  public enum OutputTableSchemaType {
-    UNSTRUCTURED,
-    STRICT,
-    WEAK
   }
 
   public static class YPathValidator implements ConfigDef.Validator {

@@ -13,7 +13,6 @@ public class DynTableWriterConfig extends BaseTableWriterConfig {
   public static final String QUEUE_POSTFIX = "yt.sink.dynamic.queue.postfix";
   public static final String QUEUE_AUTO_CREATE = "yt.sink.dynamic.queue.auto.create";
   public static final String QUEUE_TABLET_COUNT = "yt.sink.dynamic.queue.tablet.count";
-  public static final String TABLE_TYPE = "yt.sink.dynamic.table.type";
   public static final String OPERATION_FIELD = "yt.sink.dynamic.operation.field";
   public static final String TABLE_ROUTER_ENABLED = "yt.sink.dynamic.table.router.enabled";
   public static final String TABLE_ROUTER_FIELD = "yt.sink.dynamic.table.router.field";
@@ -25,10 +24,6 @@ public class DynTableWriterConfig extends BaseTableWriterConfig {
       .define(QUEUE_TABLET_COUNT, ConfigDef.Type.INT, 1, ConfigDef.Range.atLeast(1),
           ConfigDef.Importance.MEDIUM,
           "Number of tablets for the data queue table in dynamic output mode")
-      .define(TABLE_TYPE, ConfigDef.Type.STRING, "ordered",
-          ValidUpperString.in(TableType.ORDERED.name(), TableType.SORTED.name()),
-          ConfigDef.Importance.HIGH,
-          "Dyntable type. Sorted - rows ordered by key. For sorted tables key can be composite (consist from several columns) and must be unique. Sorted tables supports operations like insert, update delete. Ordered - ordered sequence of rows. Ordered tables does not have key columns. Ordered tables supports insert operations only. The closest analog of ordered tables is Apache Kafka.")
       .define(OPERATION_FIELD, ConfigDef.Type.STRING, "_op", ConfigDef.Importance.HIGH,
           "Which field name to use with ExtractField transformer to extract operation type. Works only with TABLE_TYPE 'SORTED'. Defaults to 'UPDATE'")
       .define(TABLE_ROUTER_ENABLED, ConfigDef.Type.BOOLEAN, false, ConfigDef.Importance.HIGH,
@@ -56,10 +51,6 @@ public class DynTableWriterConfig extends BaseTableWriterConfig {
     return getInt(QUEUE_TABLET_COUNT);
   }
 
-  public TableType getTableType() {
-    return TableType.valueOf(getString(TABLE_TYPE).toUpperCase());
-  }
-
   public String getOperationField() {
     return getString(OPERATION_FIELD);
   }
@@ -74,10 +65,5 @@ public class DynTableWriterConfig extends BaseTableWriterConfig {
         "max_data_versions", YTree.integerNode(1),
         "min_data_ttl", YTree.longNode(0),
         "max_data_ttl", YTree.longNode(getOutputTTL().toMillis()));
-  }
-
-  public enum TableType {
-    ORDERED,
-    SORTED,
   }
 }

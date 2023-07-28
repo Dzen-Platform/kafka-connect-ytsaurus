@@ -2,7 +2,7 @@ package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.TableType;
+import ru.dzen.kafka.connect.ytsaurus.common.TableRow;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DyntableUtils;
 import ru.dzen.kafka.connect.ytsaurus.schema.SchemaUtils;
 import tech.ytsaurus.client.ApiServiceTransaction;
@@ -16,17 +16,14 @@ import tech.ytsaurus.core.tables.TableSchema;
 public class DyntableSchemaUpdate implements TableOperation {
   private static final Logger log = LoggerFactory.getLogger(DyntableCreate.class);
 
-  private final TableType tableType;
   private final YPath tablePath;
   private final TableRow rowWithUpdatedSchema;
   private TableSchema currentSchema;
 
   public DyntableSchemaUpdate(
-      TableType tableType,
       YPath tablePath,
       TableSchema currentSchema,
       TableRow rowWithUpdatedSchema) {
-    this.tableType = tableType;
     this.tablePath = tablePath;
     this.rowWithUpdatedSchema = rowWithUpdatedSchema;
     this.currentSchema = currentSchema;
@@ -38,7 +35,7 @@ public class DyntableSchemaUpdate implements TableOperation {
     TableSchema updatedSchema = rowWithUpdatedSchema.getSchema();
     TableSchema newSchema = SchemaUtils.mergeSchemas(currentSchema, updatedSchema);
     if (alteringRequired(currentSchema, newSchema)) {
-      alterTableSchema(tx, SchemaUtils.transformSchema(newSchema, tableType));
+      alterTableSchema(tx, newSchema);
     }
   }
 

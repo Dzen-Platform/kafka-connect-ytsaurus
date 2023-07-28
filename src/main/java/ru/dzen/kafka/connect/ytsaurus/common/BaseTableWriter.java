@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -12,7 +11,6 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.AuthType;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.YTsaurusClient;
 import tech.ytsaurus.client.YTsaurusClientConfig;
@@ -66,12 +64,6 @@ public abstract class BaseTableWriter {
 
   }
 
-  protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records,
-      Set<TopicPartition> topicPartitions)
-      throws Exception {
-    writeRows(trx, records);
-  }
-
   public void writeBatch(Collection<SinkRecord> records) throws Exception {
     var startTime = System.currentTimeMillis();
     try (var trx = createTransaction()) {
@@ -82,7 +74,7 @@ public abstract class BaseTableWriter {
       if (filteredRecords.isEmpty()) {
         trx.close();
       } else {
-        writeRows(trx, filteredRecords, maxOffsets.keySet());
+        writeRows(trx, filteredRecords);
         offsetsManager.writeOffsets(trx, maxOffsets);
         trx.commit().get();
       }

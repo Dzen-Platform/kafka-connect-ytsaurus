@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.kafka.connect.errors.SchemaBuilderException;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.TableType;
 import tech.ytsaurus.core.tables.ColumnSchema;
 import tech.ytsaurus.core.tables.ColumnSortOrder;
 import tech.ytsaurus.core.tables.TableSchema;
@@ -17,6 +16,12 @@ import tech.ytsaurus.core.tables.TableSchema;
 public class SchemaUtils {
 
   public static TableSchema mergeSchemas(TableSchema currentSchema, TableSchema updatedSchema) {
+    if (currentSchema == null) {
+      return updatedSchema;
+    }
+    if (updatedSchema == null || currentSchema.equals(updatedSchema)) {
+      return currentSchema;
+    }
     List<ColumnSchema> resultSchema = new ArrayList<>();
     List<ColumnSchema> currentKeys = getKeyColumns(currentSchema);
     List<ColumnSchema> updatedKeys = getKeyColumns(updatedSchema);
@@ -25,32 +30,10 @@ public class SchemaUtils {
     List<ColumnSchema> updatedValueColumns = getValueColumns(updatedSchema);
     mergeColumns(resultSchema, currentValueColumns, updatedValueColumns);
     return TableSchema.builder()
+        .setUniqueKeys(currentSchema.isUniqueKeys() || updatedSchema.isUniqueKeys())
+        .setStrict(currentSchema.isStrict() || updatedSchema.isStrict())
         .addAll(resultSchema)
         .build();
-  }
-
-  public static TableSchema transformSchema(TableSchema schema, TableType tableType) {
-    if (schema.getColumns().isEmpty()) {
-      return schema;
-    }
-    if (tableType == TableType.ORDERED && hasSortedColumn(schema)) {
-      List<ColumnSchema> columns = schema.getColumns().stream()
-          .map(col -> col.toBuilder().setSortOrder(null).build())
-          .collect(Collectors.toList());
-      return schema.toBuilder()
-          .setColumns(columns)
-          .setUniqueKeys(false)
-          .build();
-    }
-    if (tableType == TableType.SORTED && !hasSortedColumn(schema)) {
-      List<ColumnSchema> columns = new ArrayList<>(schema.getColumns());
-      columns.set(0, columns.get(0).toBuilder().setSortOrder(ColumnSortOrder.ASCENDING).build());
-      return schema.toBuilder()
-          .setColumns(columns)
-          .setUniqueKeys(true)
-          .build();
-    }
-    return schema;
   }
 
   private static List<ColumnSchema> getKeyColumns(TableSchema schema) {

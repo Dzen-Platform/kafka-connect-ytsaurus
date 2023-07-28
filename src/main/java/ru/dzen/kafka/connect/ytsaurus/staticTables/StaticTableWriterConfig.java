@@ -59,16 +59,6 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
 
   public StaticTableWriterConfig(Map<String, String> originals) throws ConnectException {
     super(CONFIG_DEF, originals);
-
-    if (getOutputTableSchemaType().equals(OutputTableSchemaType.STRICT)) {
-      if (!getValueOutputFormat().equals(OutputFormat.ANY)) {
-        throw new ConnectException(
-            "When using the STRICT table schema type, the value format must be set to ANY!");
-      }
-    } else if (!getSchemaInferenceStrategy().equals(SchemaInferenceStrategy.DISABLED)) {
-      throw new ConnectException(
-          "Schema inference strategy could be enabled only when using STRICT schema type");
-    }
   }
 
   public YPath getOutputTablesDirectory() {

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.kafka.connect.sink.SinkRecord;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
 
 /**
  * @author pbk-vitaliy

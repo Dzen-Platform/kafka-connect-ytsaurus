@@ -17,7 +17,7 @@ class ConfigTest {
       Map.entry("yt.connection.user", "user"),
       Map.entry("yt.connection.token", "token"),
       Map.entry("yt.connection.cluster", "cluster"),
-      Map.entry("yt.sink.output.type", "DYNAMIC_TABLE"),
+      Map.entry("yt.sink.output.type", "DYNAMIC_ORDERED_TABLES"),
       Map.entry("yt.sink.output.table.schema.type", "UNSTRUCTURED"),
       Map.entry("yt.sink.output.key.format", "ANY"),
       Map.entry("yt.sink.output.value.format", "ANY"),
@@ -29,7 +29,7 @@ class ConfigTest {
   static final Map<String, String> correctStaticConfig = new HashMap<>(correctBaseConfig);
 
   static {
-    correctDynamicConfig.put("yt.sink.output.type", "DYNAMIC_TABLE");
+    correctDynamicConfig.put("yt.sink.output.type", "DYNAMIC_ORDERED_TABLES");
     correctDynamicConfig.put("yt.sink.dynamic.queue.postfix", "queue");
     correctDynamicConfig.put("yt.sink.dynamic.queue.auto.create", "true");
     correctDynamicConfig.put("yt.sink.dynamic.queue.tablet.count", "10");

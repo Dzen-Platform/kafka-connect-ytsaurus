@@ -7,10 +7,11 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputFormat;
+import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputType;
 import ru.dzen.kafka.connect.ytsaurus.serialization.SerializationUtils;
 import ru.dzen.kafka.connect.ytsaurus.serialization.TypedNode;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow.Builder;
+import ru.dzen.kafka.connect.ytsaurus.common.TableRow.Builder;
+import tech.ytsaurus.core.tables.ColumnSortOrder;
 import tech.ytsaurus.typeinfo.TiType;
 import tech.ytsaurus.ysontree.YTree;
 
@@ -22,12 +23,16 @@ public class UnstructuredSchemaTableRowMapper implements TableRowMapper, Configu
 
   private OutputFormat keyOutputFormat = OutputFormat.STRING;
   private OutputFormat valueOutputFormat = OutputFormat.STRING;
+  private ColumnSortOrder keyColumnsSortOrder;
 
   @Override
   public void configure(Map<String, ?> props) {
     BaseTableWriterConfig config = new BaseTableWriterConfig(props);
     keyOutputFormat = config.getKeyOutputFormat();
     valueOutputFormat = config.getValueOutputFormat();
+    if (config.getOutputType() == OutputType.DYNAMIC_SORTED_TABLES) {
+      keyColumnsSortOrder = ColumnSortOrder.ASCENDING;
+    }
   }
 
   public TableRow recordToRow(SinkRecord record) {
@@ -56,6 +61,7 @@ public class UnstructuredSchemaTableRowMapper implements TableRowMapper, Configu
     }
 
     Builder rowBuilder = TableRow.builder();
+    rowBuilder.setKeyColumnsSortOrder(keyColumnsSortOrder);
     rowBuilder.addKeyColumn(
         UnstructuredTableSchema.EColumn.KEY.name,
         typedKeyNode.getType(),

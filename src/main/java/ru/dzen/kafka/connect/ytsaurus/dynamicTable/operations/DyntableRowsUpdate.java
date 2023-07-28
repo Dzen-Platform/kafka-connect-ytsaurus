@@ -1,6 +1,7 @@
 package ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations;
 
 import java.util.List;
+import ru.dzen.kafka.connect.ytsaurus.common.TableRow;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.request.ModifyRowsRequest;
 import tech.ytsaurus.client.request.ModifyRowsRequest.Builder;

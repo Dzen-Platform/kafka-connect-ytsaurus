@@ -20,10 +20,11 @@ import org.apache.kafka.connect.transforms.util.SimpleConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputFormat;
+import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputType;
 import ru.dzen.kafka.connect.ytsaurus.serialization.SerializationUtils;
 import ru.dzen.kafka.connect.ytsaurus.serialization.TypedNode;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow.Builder;
+import ru.dzen.kafka.connect.ytsaurus.common.TableRow.Builder;
+import tech.ytsaurus.core.tables.ColumnSortOrder;
 import tech.ytsaurus.typeinfo.TiType;
 import tech.ytsaurus.ysontree.YTree;
 
@@ -46,6 +47,7 @@ public class FlattenedSchemaTableRowMapper implements TableRowMapper, Configurab
       .define(VALUE_COLUMNS_EXCLUDE, Type.STRING, "", Importance.MEDIUM, "Comma separated value columns exclude filter");
 
   private List<String> keyColumnsOrder = new ArrayList<>();
+  private ColumnSortOrder keyColumnsSortOrder;
   private Predicate<String> keyColumnFilter = name -> true;
   private SourceExtractor keySourceExtractor = SourceExtractor.KEY;
   private Predicate<String> valueColumnFilter = name -> true;
@@ -86,6 +88,11 @@ public class FlattenedSchemaTableRowMapper implements TableRowMapper, Configurab
           Arrays.asList(valueColumnsExclude.split(",")));
       valueColumnFilter = valueColumnFilter.and(name -> !excludedColumns.contains(name));
     }
+
+    BaseTableWriterConfig baseTableWriterConfig = new BaseTableWriterConfig(props);
+    if (baseTableWriterConfig.getOutputType() == OutputType.DYNAMIC_SORTED_TABLES) {
+      keyColumnsSortOrder = ColumnSortOrder.ASCENDING;
+    }
   }
 
   public TableRow recordToRow(SinkRecord record) {
@@ -120,6 +127,7 @@ public class FlattenedSchemaTableRowMapper implements TableRowMapper, Configurab
     }
 
     Builder rowBuilder = TableRow.builder();
+    rowBuilder.setKeyColumnsSortOrder(keyColumnsSortOrder);
     Set<String> handledKeyColumns = new HashSet<>();
     for (String key : keyColumnsOrder) {
       if (keyColumnFilter.test(key)) {

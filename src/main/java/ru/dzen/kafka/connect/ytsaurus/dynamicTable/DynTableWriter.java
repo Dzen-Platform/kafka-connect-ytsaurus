@@ -13,8 +13,9 @@ import org.apache.kafka.connect.transforms.ExtractField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriter;
+import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputType;
+import ru.dzen.kafka.connect.ytsaurus.common.TableRow;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.DynTableWriterConfig.TableType;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.RecordRouter.Destination;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableCreate;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableRowsDelete;
@@ -23,7 +24,6 @@ import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableRowsUpdate
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.DyntableSchemaUpdate;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.Operation;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableOperation;
-import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableRow;
 import ru.dzen.kafka.connect.ytsaurus.dynamicTable.operations.TableSchemaRead;
 import tech.ytsaurus.client.ApiServiceClient;
 import tech.ytsaurus.client.ApiServiceTransaction;
@@ -83,7 +83,6 @@ public class DynTableWriter extends BaseTableWriter {
         currentSchema = getInTransaction(tx.getClient(), TransactionType.Master, t -> {
           if (!t.existsNode(tablePath.toString()).join()) {
             DyntableCreate dyntableCreate = new DyntableCreate(
-                config.getTableType(),
                 tablePath,
                 tableRow.getSchema(),
                 config.getTableExtraAttributes());
@@ -103,7 +102,7 @@ public class DynTableWriter extends BaseTableWriter {
           affectedRows.clear();
         }
         DyntableSchemaUpdate schemaUpdate = new DyntableSchemaUpdate(
-            config.getTableType(), tablePath, currentSchema, tableRow);
+            tablePath, currentSchema, tableRow);
         currentSchema = getInTransaction(tx.getClient(), TransactionType.Master, t -> {
           schemaUpdate.execute(t);
           return schemaUpdate.getCurrentSchema();
@@ -176,7 +175,7 @@ public class DynTableWriter extends BaseTableWriter {
   }
 
   private Operation getOperationType(SinkRecord record) {
-    if (config.getTableType() == TableType.ORDERED) {
+    if (config.getOutputType() == OutputType.DYNAMIC_ORDERED_TABLES) {
       return Operation.CREATE;
     }
     return Optional.ofNullable(operationExtractor.apply(record))
