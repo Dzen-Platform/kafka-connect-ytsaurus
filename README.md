@@ -85,13 +85,13 @@ Coming soon
   - wget:
 
     ```
-      wget https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.1.16/kafka-connect-ytsaurus-1.1.16.jar
+      wget https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/2.0.0-alpha/kafka-connect-ytsaurus-2.0.0-alpha.jar
     ```
 
   - curl:
 
     ```
-      curl -L -O https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/1.1.16/kafka-connect-ytsaurus-1.1.16.jar
+      curl -L -O https://github.com/Dzen-Platform/kafka-connect-ytsaurus/releases/download/2.0.0-alpha/kafka-connect-ytsaurus-2.0.0-alpha.jar
     ```
 
 ### Build from Source
