@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.request.LockNode;
 import tech.ytsaurus.client.request.LockNodeResult;
+import tech.ytsaurus.typeinfo.TiType;
 import tech.ytsaurus.ysontree.YTree;
 import tech.ytsaurus.ysontree.YTreeNode;
 
@@ -83,6 +84,26 @@ public class Util {
     } else {
       throw new UnsupportedOperationException(
           "Unsupported JsonNode type: " + jsonNode.getNodeType());
+    }
+  }
+
+  public static TiType getTypeOfNode(YTreeNode node) {
+    if (node.isListNode()) {
+      return node.asList().isEmpty()
+          ? TiType.optional(TiType.list(TiType.nullType()))
+          : TiType.optional(TiType.list(getTypeOfNode(node.asList().get(0))));
+    } else if (node.isStringNode()) {
+      return TiType.optional(TiType.string());
+    } else if (node.isIntegerNode()) {
+      return TiType.optional(TiType.int64());
+    } else if (node.isDoubleNode()) {
+      return TiType.optional(TiType.doubleType());
+    } else if (node.isBooleanNode()) {
+      return TiType.optional(TiType.bool());
+    } else if (node.isEntityNode()) {
+      return TiType.optional(TiType.nullType());
+    } else {
+      return TiType.optional(TiType.yson());
     }
   }
 

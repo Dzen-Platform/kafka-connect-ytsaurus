@@ -1,23 +1,25 @@
 package ru.dzen.kafka.connect.ytsaurus.staticTables;
 
+import com.google.common.collect.Sets;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.connect.data.Schema.Type;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriter;
-import ru.dzen.kafka.connect.ytsaurus.common.BaseTableWriterConfig.OutputTableSchemaType;
 import ru.dzen.kafka.connect.ytsaurus.common.TableWriterManager;
-import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema;
-import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.EColumn;
-import ru.dzen.kafka.connect.ytsaurus.common.UnstructuredTableSchema.ETableType;
 import ru.dzen.kafka.connect.ytsaurus.common.Util;
 import ru.dzen.kafka.connect.ytsaurus.staticTables.StaticTableWriterConfig.SchemaInferenceStrategy;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.schemaInference.InferFromFinalizedTable;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.schemaInference.InferFromFirstBatch;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.schemaInference.Disabled;
+import ru.dzen.kafka.connect.ytsaurus.staticTables.schemaInference.SchemaInferenceStrategyImpl;
 import tech.ytsaurus.client.ApiServiceTransaction;
 import tech.ytsaurus.client.request.CreateNode;
 import tech.ytsaurus.client.request.Format;
@@ -28,7 +30,6 @@ import tech.ytsaurus.core.cypress.YPath;
 import tech.ytsaurus.core.request.LockMode;
 import tech.ytsaurus.core.rows.YTreeMapNodeSerializer;
 import tech.ytsaurus.core.tables.TableSchema;
-import tech.ytsaurus.typeinfo.TiType;
 import tech.ytsaurus.ysontree.YTree;
 import tech.ytsaurus.ysontree.YTreeMapNode;
 
@@ -38,17 +39,16 @@ public class StaticTableWriter extends BaseTableWriter {
 
   public final StaticTableWriterConfig config;
   protected final SchemaManager schemaManager;
-  private final TableSchema unstructuredTableSchema;
 
   public StaticTableWriter(StaticTableWriterConfig config) {
     super(config, new DocumentOffsetsManager(config.getOffsetsDirectory()));
     this.config = config;
+    this.schemaManager = new SchemaManager(config.getSchemasDirectory());
+  }
 
-    unstructuredTableSchema = UnstructuredTableSchema.createDataQueueTableSchema(
-        config.getKeyOutputFormat(), config.getValueOutputFormat(), EColumn.getAllMetadataColumns(
-            ETableType.STATIC));
-
-    schemaManager = new SchemaManager(config.getSchemasDirectory());
+  @Override
+  public TableWriterManager getManager() {
+    return new StaticTableWriterManager(config);
   }
 
   protected Instant getNow() throws Exception {
@@ -63,52 +63,37 @@ public class StaticTableWriter extends BaseTableWriter {
   }
 
   @Override
-  protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records,
-      Set<TopicPartition> topicPartitions)
+  protected void writeRows(ApiServiceTransaction trx, Collection<SinkRecord> records)
       throws Exception {
-    var mapNodesToWrite = recordsToRows(records);
-    var rows = mapNodesToWrite.stream().map(x -> (YTreeMapNode) YTree.node(x))
+    var tableRows = recordsToRows(records);
+    var rows = tableRows.stream().map(x -> (YTreeMapNode) YTree.node(x.asMap()))
         .collect(Collectors.toList());
 
-    var inferredSchemaBuilder = new InferredSchemaBuilder();
-    if (config.getSchemaInferenceStrategy()
-        .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
-      inferredSchemaBuilder = new InferredSchemaBuilder(schemaManager.getPrevSchema(trx));
-      inferredSchemaBuilder.update(rows);
-    }
-
     var outputPath = getOutputTablePath(getNow());
+    SchemaInferenceStrategyImpl schemaInferenceStrategy =
+        getSchemaInferenceStrategyImpl(config.getSchemaInferenceStrategy());
     if (trx.existsNode(outputPath.toString()).get()) {
       trx.lockNode(outputPath.toString(), LockMode.Shared).get();
       if (trx.getNode(outputPath.allAttributes().toString()).get().mapNode().get("final")
           .isPresent()) {
         throw new RuntimeException("Tried to modify finalized table!");
       }
+      schemaInferenceStrategy.init(trx, outputPath);
     } else {
       var createNodeBuilder = CreateNode.builder().setType(CypressNodeType.TABLE)
           .setPath(outputPath);
-      if (config.getSchemaInferenceStrategy()
-          .equals(SchemaInferenceStrategy.INFER_FROM_FIRST_BATCH)) {
-        inferredSchemaBuilder.update(rows);
-        var inferredSchema = inferredSchemaBuilder.build();
-        log.warn(
-            "Automatically inferred schema with %d columns from first {} rows: {}",
-            inferredSchema.getColumns().size(), rows.size(),
-            inferredSchema.toYTree().toString());
-        createNodeBuilder.setAttributes(Map.of("schema", inferredSchema.toYTree()));
-      } else if (config.getOutputTableSchemaType().equals(OutputTableSchemaType.UNSTRUCTURED)) {
-        createNodeBuilder.setAttributes(Map.of("schema", unstructuredTableSchema.toYTree()));
-      } else if (config.getOutputTableSchemaType().equals(OutputTableSchemaType.STRICT)
-          && !config.getSchemaInferenceStrategy()
-          .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
-        createNodeBuilder.setAttributes(
-            Map.of("schema", createStrictTableSchemaFromRecordsSchema(records).toYTree()));
-      }
+      schemaInferenceStrategy.update(trx, tableRows);
+      schemaInferenceStrategy.getSchema(trx).ifPresent(s -> {
+        createNodeBuilder.setAttributes(Map.of("schema", s.toYTree()));
+      });
       for (var entry : config.getExtraTablesAttributes().entrySet()) {
         createNodeBuilder.addAttribute(entry.getKey(), entry.getValue());
       }
       trx.createNode(createNodeBuilder.build()).get();
     }
+
+    Optional<TableSchema> inferredSchema = schemaInferenceStrategy.getSchema(trx);
+    inferredSchema.ifPresent(tableSchema -> removeExtraColumns(rows, tableSchema));
 
     var writeTable = WriteTable.<YTreeMapNode>builder()
         .setPath(outputPath.plusAdditionalAttribute("append", true))
@@ -123,9 +108,9 @@ public class StaticTableWriter extends BaseTableWriter {
         writer.readyEvent().get();
 
         // If false is returned, then readyEvent must be waited for before trying again.
-        var accepted = config.getOutputTableSchemaType().equals(OutputTableSchemaType.WEAK)
-            ? writer.write(rows)
-            : writer.write(rows, unstructuredTableSchema);
+        var accepted = inferredSchema.isPresent()
+            ? writer.write(rows, inferredSchema.get())
+            : writer.write(rows);
 
         if (accepted) {
           break;
@@ -137,54 +122,25 @@ public class StaticTableWriter extends BaseTableWriter {
       // Waiting for completion of writing. An exception might be thrown if something goes wrong.
       writer.close().get();
     }
+  }
 
-    if (config.getSchemaInferenceStrategy()
-        .equals(SchemaInferenceStrategy.INFER_FROM_FINALIZED_TABLE)) {
-      schemaManager.writeSchema(trx, inferredSchemaBuilder.build(), topicPartitions);
+  private SchemaInferenceStrategyImpl getSchemaInferenceStrategyImpl(
+      SchemaInferenceStrategy schemaInferenceStrategy) {
+    switch (schemaInferenceStrategy) {
+      case DISABLED:
+        return new Disabled();
+      case INFER_FROM_FIRST_BATCH:
+        return new InferFromFirstBatch();
+      case INFER_FROM_FINALIZED_TABLE:
+        return new InferFromFinalizedTable(schemaManager);
+      default:
+        throw new IllegalArgumentException(
+            "SchemaInferenceStrategy '" + schemaInferenceStrategy.name() + "' is not supported");
     }
   }
 
-  private TableSchema createStrictTableSchemaFromRecordsSchema(Collection<SinkRecord> records) {
-    var tableSchemaBuilder = UnstructuredTableSchema.createDataQueueTableSchema(
-            config.getKeyOutputFormat(), null, EColumn.getAllMetadataColumns(ETableType.STATIC))
-        .toBuilder();
-    var firstRecord = records.stream().iterator().next();
-    var firstRecordValueSchema = firstRecord.valueSchema();
-    for (var field : firstRecordValueSchema.fields()) {
-      var columnType = recordSchemaTypeToColumnType(field.schema().type());
-      if (field.schema().isOptional() || columnType.isYson()) {
-        columnType = TiType.optional(columnType);
-      }
-      tableSchemaBuilder.addValue(field.name(), columnType);
-    }
-    return tableSchemaBuilder.build();
-  }
-
-  private TiType recordSchemaTypeToColumnType(Type type) {
-    switch (type) {
-      case INT8:
-        return TiType.int8();
-      case INT16:
-        return TiType.int16();
-      case INT32:
-        return TiType.int32();
-      case INT64:
-        return TiType.int64();
-      case FLOAT32:
-        return TiType.floatType();
-      case FLOAT64:
-        return TiType.doubleType();
-      case BOOLEAN:
-        return TiType.bool();
-      case STRING:
-      case BYTES:
-        return TiType.string();
-    }
-    return TiType.yson();
-  }
-
-  @Override
-  public TableWriterManager getManager() {
-    return new StaticTableWriterManager(config);
+  private void removeExtraColumns(List<YTreeMapNode> rows, TableSchema tableSchema) {
+    Set<String> schemaColumns = new HashSet<>(tableSchema.getColumnNames());
+    rows.forEach(r -> new HashSet<>(Sets.difference(r.keys(), schemaColumns)).forEach(r::remove));
   }
 }

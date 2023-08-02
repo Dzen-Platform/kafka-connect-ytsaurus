@@ -34,7 +34,8 @@ public class YtTableSinkTask extends SinkTask {
   @Override
   public void start(Map<String, String> props) {
     BaseTableWriterConfig config = new BaseTableWriterConfig(props);
-    if (config.getOutputType() == BaseTableWriterConfig.OutputType.DYNAMIC_TABLE) {
+    if (config.getOutputType() == BaseTableWriterConfig.OutputType.DYNAMIC_ORDERED_TABLES
+        || config.getOutputType() == BaseTableWriterConfig.OutputType.DYNAMIC_SORTED_TABLES) {
       producer = new DynTableWriter(new DynTableWriterConfig(props));
     } else if (config.getOutputType() == BaseTableWriterConfig.OutputType.STATIC_TABLES) {
       producer = new StaticTableWriter(new StaticTableWriterConfig(props));

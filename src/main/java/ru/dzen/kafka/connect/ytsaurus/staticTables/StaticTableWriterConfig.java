@@ -13,16 +13,16 @@ import tech.ytsaurus.ysontree.YTreeNode;
 
 public class StaticTableWriterConfig extends BaseTableWriterConfig {
 
-  private static final String ROTATION_PERIOD = "yt.sink.static.rotation.period";
-  private static final String OUTPUT_TABLES_DIRECTORY_POSTFIX = "yt.sink.static.tables.dir.postfix";
-  private static final String MERGE_CHUNKS = "yt.sink.static.merge.chunks";
-  private static final String CHUNK_MERGER_ATTRIBUTE_ENABLED = "yt.sink.static.chunk.merger.attribute.enabled";
-  private static final String MERGE_DATA_SIZE_PER_JOB = "yt.sink.static.merge.data.size.per.job";
-  private static final String SCHEMA_INFERENCE_STRATEGY = "yt.sink.static.tables.schema.inference.strategy";
-  private static final String COMPRESSION_CODEC = "yt.sink.static.tables.compression.codec";
-  private static final String OPTIMIZE_FOR = "yt.sink.static.tables.optimize.for";
-  private static final String REPLICATION_FACTOR = "yt.sink.static.tables.replication.factor";
-  private static final String ERASURE_CODEC = "yt.sink.static.tables.erasure.codec";
+  public static final String ROTATION_PERIOD = "yt.sink.static.rotation.period";
+  public static final String OUTPUT_TABLES_DIRECTORY_POSTFIX = "yt.sink.static.tables.dir.postfix";
+  public static final String MERGE_CHUNKS = "yt.sink.static.merge.chunks";
+  public static final String CHUNK_MERGER_ATTRIBUTE_ENABLED = "yt.sink.static.chunk.merger.attribute.enabled";
+  public static final String MERGE_DATA_SIZE_PER_JOB = "yt.sink.static.merge.data.size.per.job";
+  public static final String SCHEMA_INFERENCE_STRATEGY = "yt.sink.static.tables.schema.inference.strategy";
+  public static final String COMPRESSION_CODEC = "yt.sink.static.tables.compression.codec";
+  public static final String OPTIMIZE_FOR = "yt.sink.static.tables.optimize.for";
+  public static final String REPLICATION_FACTOR = "yt.sink.static.tables.replication.factor";
+  public static final String ERASURE_CODEC = "yt.sink.static.tables.erasure.codec";
 
   public static ConfigDef CONFIG_DEF = new ConfigDef(BaseTableWriterConfig.CONFIG_DEF)
       .define(ROTATION_PERIOD, ConfigDef.Type.STRING, ConfigDef.Importance.HIGH, "Rotation period")
@@ -59,16 +59,6 @@ public class StaticTableWriterConfig extends BaseTableWriterConfig {
 
   public StaticTableWriterConfig(Map<String, String> originals) throws ConnectException {
     super(CONFIG_DEF, originals);
-
-    if (getOutputTableSchemaType().equals(OutputTableSchemaType.STRICT)) {
-      if (!getValueOutputFormat().equals(OutputFormat.ANY)) {
-        throw new ConnectException(
-            "When using the STRICT table schema type, the value format must be set to ANY!");
-      }
-    } else if (!getSchemaInferenceStrategy().equals(SchemaInferenceStrategy.DISABLED)) {
-      throw new ConnectException(
-          "Schema inference strategy could be enabled only when using STRICT schema type");
-    }
   }
 
   public YPath getOutputTablesDirectory() {

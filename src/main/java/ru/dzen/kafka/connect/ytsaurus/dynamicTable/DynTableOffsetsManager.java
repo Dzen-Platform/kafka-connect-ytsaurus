@@ -24,7 +24,7 @@ public class DynTableOffsetsManager extends BaseOffsetsManager {
   }
 
   @Override
-  public Map<TopicPartition, OffsetAndMetadata> getPrevOffsets(ApiServiceTransaction trx,
+  public Map<TopicPartition, OffsetAndMetadata> getCommittedOffsets(ApiServiceTransaction trx,
       Set<TopicPartition> topicPartitions) throws InterruptedException, ExecutionException {
     var requestBuilder = LookupRowsRequest.builder()
         .setPath(pathToOffsetsTable.toString())
