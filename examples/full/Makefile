@@ -1,13 +1,13 @@
 # Define phony targets to prevent conflicts with file names
 .PHONY: up down create-connector connect-logs wait build build-images print-output-table produce-json-schema-messages
 
-# Bring up the docker-compose environment
+# Bring up the docker compose environment
 up: build
-	docker-compose up -d
+	docker compose up -d
 
-# Bring down the docker-compose environment and remove orphans
+# Bring down the docker compose environment and remove orphans
 down:
-	docker-compose down --remove-orphans
+	docker compose down --remove-orphans
 
 # Create specific YTsaurus sink connector
 create-connector: wait
@@ -41,7 +41,7 @@ remove-all-connectors:
 
 # Follow the logs of the Kafka Connect service
 connect-logs:
-	docker-compose logs --follow connect
+	docker compose logs --follow connect
 
 # Wait for the Kafka Connect service to start
 wait:
@@ -49,7 +49,7 @@ wait:
 
 # Build the docker images for the environment
 build: build-images
-	docker-compose build
+	docker compose build
 
 # Build the docker images for each component of the environment
 build-images:
@@ -64,18 +64,18 @@ print-output-table:
 		echo "Error: Please provide a connector name using CONNECTOR_NAME=<connector_name>"; \
 		exit 1; \
 	fi; \
-	TABLE_NAME=$$(docker-compose exec -it yt-client yt list //home/$(CONNECTOR_NAME)/test/output | head -n 1); \
-	docker-compose exec -it yt-client yt read-table --format json "//home/$(CONNECTOR_NAME)/test/output/$$TABLE_NAME" | head -n 10;
+	TABLE_NAME=$$(docker compose exec -it yt-client yt list //home/$(CONNECTOR_NAME)/test/output | head -n 1); \
+	docker compose exec -it yt-client yt read-table --format json "//home/$(CONNECTOR_NAME)/test/output/$$TABLE_NAME" | head -n 10;
 
 produce-json-schema-messages:
 	@if [ -z "$(SCHEMA_NAME)" ]; then \
 		echo "Error: Please provide a schema name using SCHEMA_NAME=<schema_name>"; \
 		exit 1; \
 	fi; \
-	docker-compose cp "schemas/$$SCHEMA_NAME.json" schema-registry:/schema.json; \
-	docker-compose cp "data/$$SCHEMA_NAME.ndjson" schema-registry:/data.ndjson; \
-	docker-compose cp "scripts/produce-json-schema-messages.sh" schema-registry:/; \
-	docker-compose exec -it schema-registry /produce-json-schema-messages.sh $$SCHEMA_NAME
+	docker compose cp "schemas/$$SCHEMA_NAME.json" schema-registry:/schema.json; \
+	docker compose cp "data/$$SCHEMA_NAME.ndjson" schema-registry:/data.ndjson; \
+	docker compose cp "scripts/produce-json-schema-messages.sh" schema-registry:/; \
+	docker compose exec -it schema-registry /produce-json-schema-messages.sh $$SCHEMA_NAME
 
 produce-messages-for-all-schemas: wait
 	@for file in schemas/*; do \
